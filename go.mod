@@ -1,4 +1,4 @@
-module github.com/orthanc/firehoseReader
+module github.com/orthanc/feedgenerator
 
 go 1.23.1
 
