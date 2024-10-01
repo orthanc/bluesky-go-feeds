@@ -9,8 +9,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/bluesky-social/indigo/atproto/data"
 	"github.com/bluesky-social/indigo/api/atproto"
+	"github.com/bluesky-social/indigo/atproto/data"
 	"github.com/bluesky-social/indigo/events"
 	"github.com/bluesky-social/indigo/events/schedulers/sequential"
 	"github.com/bluesky-social/indigo/repo"
@@ -18,8 +18,9 @@ import (
 )
 
 type firehoseEvent struct {
+	uri string
 	seq int64
-	repo string
+	author string
 	collection string
 	rid string
 	eventKind repomgr.EventKind
@@ -33,7 +34,9 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	collection, rid := parts[0], parts[1]
 	eventKind :=  repomgr.EventKind(op.Action)
 	event := firehoseEvent{
+		uri: fmt.Sprintf("at://%s/%s", evt.Repo, op.Path),
 		seq: evt.Seq,
+		author: evt.Repo,
 		collection: collection,
 		rid: rid,
 		eventKind: eventKind,
@@ -42,15 +45,15 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	case repomgr.EvtKindCreateRecord, repomgr.EvtKindUpdateRecord:
 		rr, err := repo.ReadRepoFromCar(ctx, bytes.NewReader(evt.Blocks))
 		if err != nil {
-			return event, fmt.Errorf("Error reading %s car: %s", collection, err)
+			return event, fmt.Errorf("error reading %s car: %s", collection, err)
 		}
 		_, recCBOR, err := rr.GetRecordBytes(ctx, op.Path)
 		if err != nil {
-			return event, fmt.Errorf("Error reading %s bytes: %s", collection, err)
+			return event, fmt.Errorf("error reading %s bytes: %s", collection, err)
 		}
 		d, err := data.UnmarshalCBOR(*recCBOR)
 		if err != nil {
-			return event, fmt.Errorf("Error munarshaling %s: %s", collection, err)
+			return event, fmt.Errorf("error unmarshaling %s: %s", collection, err)
 		}
 
 		event.record = d

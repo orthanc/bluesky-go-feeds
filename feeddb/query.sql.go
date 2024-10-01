@@ -10,6 +10,69 @@ import (
 	"database/sql"
 )
 
+const listPosts = `-- name: ListPosts :many
+SELECT "author",
+    "directReplyCount",
+    "indexedAt",
+    "interactionCount",
+    "likeCount",
+    "replyCount",
+    "uri",
+    "replyParent",
+    "replyParentAuthor",
+    "replyRoot",
+    "replyRootAuthor" FROM post
+`
+
+type ListPostsRow struct {
+	Author            string
+	DirectReplyCount  float64
+	IndexedAt         string
+	InteractionCount  float64
+	LikeCount         float64
+	ReplyCount        float64
+	Uri               string
+	ReplyParent       sql.NullString
+	ReplyParentAuthor sql.NullString
+	ReplyRoot         sql.NullString
+	ReplyRootAuthor   sql.NullString
+}
+
+func (q *Queries) ListPosts(ctx context.Context) ([]ListPostsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPosts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPostsRow
+	for rows.Next() {
+		var i ListPostsRow
+		if err := rows.Scan(
+			&i.Author,
+			&i.DirectReplyCount,
+			&i.IndexedAt,
+			&i.InteractionCount,
+			&i.LikeCount,
+			&i.ReplyCount,
+			&i.Uri,
+			&i.ReplyParent,
+			&i.ReplyParentAuthor,
+			&i.ReplyRoot,
+			&i.ReplyRootAuthor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const savePost = `-- name: SavePost :exec
 insert into
   post (
