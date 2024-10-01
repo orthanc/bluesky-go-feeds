@@ -1,8 +1,8 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    queries: "query.sql"
-    schema: "migrations"
+    queries: "database/query.sql"
+    schema: "database/migrations"
     gen:
       go:
         package: "feeddb"

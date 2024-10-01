@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/feeddb"
 	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
@@ -15,7 +16,8 @@ func main() {
 
 	ctx := context.Background()
 
-	queries := createDb()
+	database := database.New()
+	database.Migrate()
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	// firehoseListeners["app.bsky.graph.follow"] = func(event firehoseEvent) {
@@ -23,7 +25,7 @@ func main() {
 	// }
 	postProcessor := processor.PostProcessor{
 		Ctx:     ctx,
-		Queries: *queries,
+		Database: database,
 	}
 	firehoseListeners["app.bsky.feed.post"] = postProcessor.Process
 	// firehoseListeners["app.bsky.feed.like"] = func(event firehoseEvent) {

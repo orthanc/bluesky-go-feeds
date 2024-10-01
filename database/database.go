@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -13,21 +13,32 @@ import (
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
-func createDb() *feeddb.Queries {
+type Database struct {
+	DB *sql.DB
+	Queries *feeddb.Queries
+}
+
+func New() *Database {
 	db, err := sql.Open("sqlite3", "feed-data.sqllite")
 	if err != nil {
 		panic(err)
 	}
 
+	queries := feeddb.New(db)
+
+	database := Database{
+		DB: db,
+		Queries: queries,
+	}
+	return &database;
+}
+
+func (database *Database) Migrate() {
 	goose.SetBaseFS(embedMigrations)
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		panic(err)
 	}
-	if err := goose.Up(db, "migrations"); err != nil {
+	if err := goose.Up(database.DB, "migrations"); err != nil {
 		panic(err)
 	}
-
-	queries := feeddb.New(db)
-
-	return queries
 }
