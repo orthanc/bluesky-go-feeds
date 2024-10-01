@@ -1,4 +1,4 @@
-package main
+package subscription
 
 import (
 	"bytes"
@@ -17,29 +17,29 @@ import (
 	"github.com/bluesky-social/indigo/repomgr"
 )
 
-type firehoseEvent struct {
-	uri        string
-	seq        int64
-	author     string
-	collection string
-	rid        string
-	eventKind  repomgr.EventKind
-	record     map[string]any
+type FirehoseEvent struct {
+	Uri        string
+	Seq        int64
+	Author     string
+	Collection string
+	Rid        string
+	EventKind  repomgr.EventKind
+	Record     map[string]any
 }
 
-type firehoseEventListener func(firehoseEvent)
+type FirehoseEventListener func(FirehoseEvent)
 
-func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op *atproto.SyncSubscribeRepos_RepoOp) (firehoseEvent, error) {
+func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op *atproto.SyncSubscribeRepos_RepoOp) (FirehoseEvent, error) {
 	parts := strings.SplitN(op.Path, "/", 3)
 	collection, rid := parts[0], parts[1]
 	eventKind := repomgr.EventKind(op.Action)
-	event := firehoseEvent{
-		uri:        fmt.Sprintf("at://%s/%s", evt.Repo, op.Path),
-		seq:        evt.Seq,
-		author:     evt.Repo,
-		collection: collection,
-		rid:        rid,
-		eventKind:  eventKind,
+	event := FirehoseEvent{
+		Uri:        fmt.Sprintf("at://%s/%s", evt.Repo, op.Path),
+		Seq:        evt.Seq,
+		Author:     evt.Repo,
+		Collection: collection,
+		Rid:        rid,
+		EventKind:  eventKind,
 	}
 	switch eventKind {
 	case repomgr.EvtKindCreateRecord, repomgr.EvtKindUpdateRecord:
@@ -56,14 +56,14 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 			return event, fmt.Errorf("error unmarshaling %s: %s", collection, err)
 		}
 
-		event.record = d
+		event.Record = d
 		return event, nil
 	default:
 		return event, nil
 	}
 }
 
-func subscribe(ctx context.Context, url string, listeners map[string]firehoseEventListener) {
+func Subscribe(ctx context.Context, url string, listeners map[string]FirehoseEventListener) {
 	dialer := websocket.DefaultDialer
 	con, _, err := dialer.Dial(url, http.Header{})
 	if err != nil {
