@@ -1,3 +1,4 @@
+-- +goose Up
 create table post (
   "uri" varchar primary key,
   "author" varchar not null,
