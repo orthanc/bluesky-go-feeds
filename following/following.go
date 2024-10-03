@@ -20,6 +20,7 @@ type AllFollowing struct {
 	database *database.Database
 	client *xrpc.Client
 
+	UserDids map[string]bool
 	FollowingRecords map[string]feeddb.Following
 	FollowedByCount map[string]int
 }
@@ -29,6 +30,7 @@ func New(ctx context.Context, database *database.Database, client *xrpc.Client) 
 		ctx: ctx,
 		database: database,
 		client: client,
+		UserDids: make(map[string]bool),
 		FollowingRecords: make(map[string]feeddb.Following),
 		FollowedByCount: make(map[string]int),
 	}
@@ -40,6 +42,36 @@ func  (allFollowing *AllFollowing) addFollowData(record feeddb.Following) {
 	}
 	allFollowing.FollowingRecords[record.Uri] = record
 	allFollowing.FollowedByCount[record.Following]++
+}
+
+func  (allFollowing *AllFollowing) removeFollowData(uri string) (feeddb.Following, bool) {
+	record, ok := allFollowing.FollowingRecords[uri];
+	if ok {
+		allFollowing.FollowedByCount[record.Following]--
+		if allFollowing.FollowedByCount[record.Following] <= 0 {
+			delete(allFollowing.FollowedByCount, record.Following)
+		}
+		delete(allFollowing.FollowingRecords, uri)
+	}
+	return record, ok
+}
+
+func (allFollowing *AllFollowing) Hydrate() {
+	userDids, err := allFollowing.database.Queries.ListAllUsers(allFollowing.ctx);
+	if err != nil {
+		panic(err)
+	}
+	for _, userDid := range userDids {
+		allFollowing.UserDids[userDid] = true
+	}
+
+	followingRecords, err := allFollowing.database.Queries.ListAllFollowing(allFollowing.ctx)
+	if err != nil {
+		panic(err)
+	}
+	for _, followingRecord :=  range followingRecords {
+		allFollowing.addFollowData(followingRecord)
+	}
 }
 
 func (allFollowing *AllFollowing) saveFollowingPage(records []feeddb.Following) {
@@ -83,6 +115,7 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 	if err := allFollowing.database.Queries.SaveUser(allFollowing.ctx, user); err != nil {
 		panic(err)
 	}
+	allFollowing.UserDids[userDid] = true
 
 	follows := make([]feeddb.Following, 0, 100)
 	for cursor := "";; {
@@ -106,5 +139,26 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 			break;
 		}
 		cursor = *followResult.Cursor
+	}
+}
+
+func (allFollowing *AllFollowing) RecordFollow(uri string, followedBy string, following string) {
+	record := feeddb.Following{
+		Uri: uri,
+		Following: following,
+		FollowedBy: followedBy,
+		UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
+	}
+
+	allFollowing.saveFollowingPage([]feeddb.Following{record})
+}
+
+func (allFollowing *AllFollowing) RemoveFollow(uri string) {
+	_, ok := allFollowing.removeFollowData(uri)
+	if ok {
+		err := allFollowing.database.Queries.DeleteFollowing(allFollowing.ctx, uri)
+		if err != nil {
+			panic(err)
+		}
 	}
 }

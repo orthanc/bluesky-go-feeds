@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/bluesky-social/indigo/repomgr"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/feeddb"
@@ -29,12 +29,31 @@ func main() {
 		database,
 		&client,
 	)
-	allFollowing.SyncFollowers("did:plc:crngjmsdh3zpuhmd5gtgwx6q", time.Now().Format(time.RFC3339))
+	allFollowing.Hydrate()
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
-	// firehoseListeners["app.bsky.graph.follow"] = func(event firehoseEvent) {
-	// 	// fmt.Println(event)
-	// }
+	firehoseListeners["app.bsky.graph.follow"] = func(event subscription.FirehoseEvent) {
+		switch event.EventKind {
+		case repomgr.EvtKindCreateRecord:
+			if allFollowing.UserDids[event.Author] {
+				fmt.Println(allFollowing.FollowedByCount[event.Record["subject"].(string)])
+				fmt.Println(allFollowing.FollowingRecords[event.Uri])
+				allFollowing.RecordFollow(event.Uri, event.Author, event.Record["subject"].(string))
+				fmt.Printf("Record Following %s %s => %s\n", event.Uri, event.Author, event.Record["subject"].(string))
+				fmt.Println(allFollowing.FollowedByCount[event.Record["subject"].(string)])
+				fmt.Println(allFollowing.FollowingRecords[event.Uri])
+			}
+		case repomgr.EvtKindDeleteRecord:
+			if allFollowing.UserDids[event.Author] {
+				fmt.Println(allFollowing.FollowedByCount["did:plc:k626emd4xi4h3wxpd44s4wpk"])
+				fmt.Println(allFollowing.FollowingRecords[event.Uri])
+				allFollowing.RemoveFollow(event.Uri)
+				fmt.Printf("Remove Following %s %s\n", event.Uri, event.Author)
+				fmt.Println(allFollowing.FollowedByCount["did:plc:k626emd4xi4h3wxpd44s4wpk"])
+				fmt.Println(allFollowing.FollowingRecords[event.Uri])
+			}
+		}
+	}
 	postProcessor := processor.PostProcessor{
 		Ctx:      ctx,
 		Database: database,

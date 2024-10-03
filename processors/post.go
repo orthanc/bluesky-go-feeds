@@ -50,7 +50,4 @@ func (processor *PostProcessor) Process(event subscription.FirehoseEvent) {
 	})
 	tx.Commit()
 
-	if reply != nil {
-		panic("test")
-	}
 }

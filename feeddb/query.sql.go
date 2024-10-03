@@ -10,6 +10,74 @@ import (
 	"database/sql"
 )
 
+const deleteFollowing = `-- name: DeleteFollowing :exec
+delete from following where uri = ?
+`
+
+func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
+	_, err := q.db.ExecContext(ctx, deleteFollowing, uri)
+	return err
+}
+
+const listAllFollowing = `-- name: ListAllFollowing :many
+select uri, followedBy, "following", userInteractionRatio from following
+`
+
+func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
+	rows, err := q.db.QueryContext(ctx, listAllFollowing)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Following
+	for rows.Next() {
+		var i Following
+		if err := rows.Scan(
+			&i.Uri,
+			&i.FollowedBy,
+			&i.Following,
+			&i.UserInteractionRatio,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllUsers = `-- name: ListAllUsers :many
+select "userDid" FROM user
+`
+
+func (q *Queries) ListAllUsers(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listAllUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var userDid string
+		if err := rows.Scan(&userDid); err != nil {
+			return nil, err
+		}
+		items = append(items, userDid)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPosts = `-- name: ListPosts :many
 SELECT "author",
     "directReplyCount",
