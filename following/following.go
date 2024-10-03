@@ -15,22 +15,46 @@ import (
 	"github.com/orthanc/feedgenerator/feeddb"
 )
 
-type Following struct {
-	Ctx context.Context
-	Database *database.Database
-	Client *xrpc.Client
+type AllFollowing struct {
+	ctx context.Context
+	database *database.Database
+	client *xrpc.Client
+
+	FollowingRecords map[string]feeddb.Following
+	FollowedByCount map[string]int
 }
 
-func (following *Following) saveFollowingPage(records []feeddb.Following) {
-	tx, err := following.Database.DB.Begin()
+func New(ctx context.Context, database *database.Database, client *xrpc.Client) AllFollowing {
+	return AllFollowing{
+		ctx: ctx,
+		database: database,
+		client: client,
+		FollowingRecords: make(map[string]feeddb.Following),
+		FollowedByCount: make(map[string]int),
+	}
+}
+
+func  (allFollowing *AllFollowing) addFollowData(record feeddb.Following) {
+	if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
+		return
+	}
+	allFollowing.FollowingRecords[record.Uri] = record
+	allFollowing.FollowedByCount[record.Following]++
+}
+
+func (allFollowing *AllFollowing) saveFollowingPage(records []feeddb.Following) {
+	tx, err := allFollowing.database.DB.Begin()
 	if err != nil {
 		panic(err)
 	}
 	defer tx.Rollback()
-
-	qtx := following.Database.Queries.WithTx(tx)
+	
+	qtx := allFollowing.database.Queries.WithTx(tx)
 	for _, record := range records {
-		if err := qtx.SaveFollowing(following.Ctx, feeddb.SaveFollowingParams(record)); err != nil {
+		if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
+			continue
+		}
+		if err := qtx.SaveFollowing(allFollowing.ctx, feeddb.SaveFollowingParams(record)); err != nil {
 			panic(err)
 		}
 
@@ -41,27 +65,28 @@ func (following *Following) saveFollowingPage(records []feeddb.Following) {
 			MedianLikeCount: 0,
 			MedianReplyCount: 0,
 		}
-		if err := qtx.SaveAuthor(following.Ctx, author); err != nil {
+		if err := qtx.SaveAuthor(allFollowing.ctx, author); err != nil {
 			panic(err)
 		}
-		// TODO local state
+
+		allFollowing.addFollowData(record)
 	}
 
 	tx.Commit()
 }
 
-func (following *Following) SyncFollowers(userDid string, lastSeen string) {
+func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string) {
 	user := feeddb.SaveUserParams{
 		UserDid: userDid,
 		LastSeen: lastSeen,
 	}
-	if err := following.Database.Queries.SaveUser(following.Ctx, user); err != nil {
+	if err := allFollowing.database.Queries.SaveUser(allFollowing.ctx, user); err != nil {
 		panic(err)
 	}
 
 	follows := make([]feeddb.Following, 0, 100)
 	for cursor := "";; {
-		followResult, err := atproto.RepoListRecords(following.Ctx, following.Client, "app.bsky.graph.follow", cursor, 100, userDid, false, "", "")
+		followResult, err := atproto.RepoListRecords(allFollowing.ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, userDid, false, "", "")
 		if err != nil {
 			panic(err)
 		}
@@ -75,7 +100,7 @@ func (following *Following) SyncFollowers(userDid string, lastSeen string) {
 				UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 			}
 		}
-		following.saveFollowingPage(follows)
+		allFollowing.saveFollowingPage(follows)
 		fmt.Println("Saved Page")
 		if (followResult.Cursor == nil) {
 			break;

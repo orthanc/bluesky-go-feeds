@@ -16,7 +16,6 @@ import (
 )
 
 func main() {
-
 	ctx := context.Background()
 
 	database := database.New()
@@ -25,20 +24,19 @@ func main() {
 	client := xrpc.Client{
 		Host: "https://bsky.social",
 	}
-	following := following.Following{
-		Ctx: ctx,
-		Client: &client,
-		Database: database,
-	}
-	following.SyncFollowers("did:plc:crngjmsdh3zpuhmd5gtgwx6q", time.Now().Format(time.RFC3339))
-
+	allFollowing := following.New(
+		ctx,
+		database,
+		&client,
+	)
+	allFollowing.SyncFollowers("did:plc:crngjmsdh3zpuhmd5gtgwx6q", time.Now().Format(time.RFC3339))
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	// firehoseListeners["app.bsky.graph.follow"] = func(event firehoseEvent) {
 	// 	// fmt.Println(event)
 	// }
 	postProcessor := processor.PostProcessor{
-		Ctx:     ctx,
+		Ctx:      ctx,
 		Database: database,
 	}
 	firehoseListeners["app.bsky.feed.post"] = postProcessor.Process
