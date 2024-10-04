@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"embed"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
@@ -19,7 +20,7 @@ type Database struct {
 }
 
 func New() *Database {
-	db, err := sql.Open("sqlite3", "feed-data.sqllite")
+	db, err := sql.Open("sqlite3", os.Getenv("FEEDGEN_SQLITE_LOCATION"))
 	if err != nil {
 		panic(err)
 	}

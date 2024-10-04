@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
+	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/bluesky-social/indigo/repomgr"
@@ -63,7 +65,7 @@ func main() {
 	// 	// fmt.Println(event)
 	// }
 	fmt.Println("Starting")
-	subscription.Subscribe(ctx, "wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos", firehoseListeners)
+	subscription.Subscribe(ctx, fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos", os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT")), firehoseListeners)
 
 	test := feeddb.Author{
 		Did:                    "",
