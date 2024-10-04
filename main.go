@@ -15,6 +15,7 @@ import (
 	"github.com/orthanc/feedgenerator/following"
 	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
+	"github.com/orthanc/feedgenerator/web"
 )
 
 func main() {
@@ -32,6 +33,8 @@ func main() {
 		&client,
 	)
 	allFollowing.Hydrate()
+
+	go web.StartServer()
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = func(event subscription.FirehoseEvent) {
