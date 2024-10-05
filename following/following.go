@@ -12,7 +12,8 @@ import (
 	"github.com/bluesky-social/indigo/xrpc"
 
 	"github.com/orthanc/feedgenerator/database"
-	"github.com/orthanc/feedgenerator/feeddb"
+	schema "github.com/orthanc/feedgenerator/database/read"
+	writeSchema "github.com/orthanc/feedgenerator/database/write"
 )
 
 type AllFollowing struct {
@@ -21,7 +22,7 @@ type AllFollowing struct {
 	client *xrpc.Client
 
 	UserDids map[string]bool
-	FollowingRecords map[string]feeddb.Following
+	FollowingRecords map[string]schema.Following
 	FollowedByCount map[string]int
 }
 
@@ -31,12 +32,12 @@ func New(ctx context.Context, database *database.Database, client *xrpc.Client) 
 		database: database,
 		client: client,
 		UserDids: make(map[string]bool),
-		FollowingRecords: make(map[string]feeddb.Following),
+		FollowingRecords: make(map[string]schema.Following),
 		FollowedByCount: make(map[string]int),
 	}
 }
 
-func  (allFollowing *AllFollowing) addFollowData(record feeddb.Following) {
+func  (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 	if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
 		return
 	}
@@ -44,7 +45,7 @@ func  (allFollowing *AllFollowing) addFollowData(record feeddb.Following) {
 	allFollowing.FollowedByCount[record.Following]++
 }
 
-func  (allFollowing *AllFollowing) removeFollowData(uri string) (feeddb.Following, bool) {
+func  (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
 	record, ok := allFollowing.FollowingRecords[uri];
 	if ok {
 		allFollowing.FollowedByCount[record.Following]--
@@ -74,30 +75,29 @@ func (allFollowing *AllFollowing) Hydrate() {
 	}
 }
 
-func (allFollowing *AllFollowing) saveFollowingPage(records []feeddb.Following) {
-	tx, err := allFollowing.database.DB.Begin()
+func (allFollowing *AllFollowing) saveFollowingPage(records []schema.Following) {
+	updates, tx, err := allFollowing.database.BeginTx(allFollowing.ctx)
 	if err != nil {
 		panic(err)
 	}
 	defer tx.Rollback()
 	
-	qtx := allFollowing.database.Queries.WithTx(tx)
 	for _, record := range records {
 		if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
 			continue
 		}
-		if err := qtx.SaveFollowing(allFollowing.ctx, feeddb.SaveFollowingParams(record)); err != nil {
+		if err := updates.SaveFollowing(allFollowing.ctx, writeSchema.SaveFollowingParams(record)); err != nil {
 			panic(err)
 		}
 
-		author := feeddb.SaveAuthorParams{
+		author := writeSchema.SaveAuthorParams{
 			Did: record.Following,
 			MedianDirectReplyCount: 0,
 			MedianInteractionCount: 0,
 			MedianLikeCount: 0,
 			MedianReplyCount: 0,
 		}
-		if err := qtx.SaveAuthor(allFollowing.ctx, author); err != nil {
+		if err := updates.SaveAuthor(allFollowing.ctx, author); err != nil {
 			panic(err)
 		}
 
@@ -108,16 +108,16 @@ func (allFollowing *AllFollowing) saveFollowingPage(records []feeddb.Following) 
 }
 
 func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string) {
-	user := feeddb.SaveUserParams{
+	user := writeSchema.SaveUserParams{
 		UserDid: userDid,
 		LastSeen: lastSeen,
 	}
-	if err := allFollowing.database.Queries.SaveUser(allFollowing.ctx, user); err != nil {
+	if err := allFollowing.database.Updates.SaveUser(allFollowing.ctx, user); err != nil {
 		panic(err)
 	}
 	allFollowing.UserDids[userDid] = true
 
-	follows := make([]feeddb.Following, 0, 100)
+	follows := make([]schema.Following, 0, 100)
 	for cursor := "";; {
 		followResult, err := atproto.RepoListRecords(allFollowing.ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, userDid, false, "", "")
 		if err != nil {
@@ -126,7 +126,7 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 
 		follows = follows[:len(followResult.Records)]
 		for i, record := range followResult.Records {
-			follows[i] = feeddb.Following{
+			follows[i] = schema.Following{
 				Uri: record.Uri,
 				Following: record.Value.Val.(*bsky.GraphFollow).Subject,
 				FollowedBy: userDid,
@@ -143,20 +143,20 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 }
 
 func (allFollowing *AllFollowing) RecordFollow(uri string, followedBy string, following string) {
-	record := feeddb.Following{
+	record := schema.Following{
 		Uri: uri,
 		Following: following,
 		FollowedBy: followedBy,
 		UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 	}
 
-	allFollowing.saveFollowingPage([]feeddb.Following{record})
+	allFollowing.saveFollowingPage([]schema.Following{record})
 }
 
 func (allFollowing *AllFollowing) RemoveFollow(uri string) {
 	_, ok := allFollowing.removeFollowData(uri)
 	if ok {
-		err := allFollowing.database.Queries.DeleteFollowing(allFollowing.ctx, uri)
+		err := allFollowing.database.Updates.DeleteFollowing(allFollowing.ctx, uri)
 		if err != nil {
 			panic(err)
 		}

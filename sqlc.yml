@@ -1,9 +1,19 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    queries: "database/query.sql"
+    queries: "database/queries.sql"
     schema: "database/migrations"
     gen:
       go:
-        package: "feeddb"
-        out: "feeddb"
+        package: "read"
+        out: "database/read"
+  - engine: "sqlite"
+    queries:
+      - "database/updates.sql"
+      - "database/queries.sql"
+    schema: "database/migrations"
+    gen:
+      go:
+        package: "write"
+        out: "database/write"
+        emit_empty_slices: true

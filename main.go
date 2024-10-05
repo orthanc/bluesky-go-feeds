@@ -11,7 +11,6 @@ import (
 	"github.com/bluesky-social/indigo/repomgr"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/orthanc/feedgenerator/database"
-	"github.com/orthanc/feedgenerator/feeddb"
 	"github.com/orthanc/feedgenerator/following"
 	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
@@ -21,8 +20,10 @@ import (
 func main() {
 	ctx := context.Background()
 
-	database := database.New()
-	database.Migrate()
+	database, err := database.NewDatabase(ctx)
+	if err != nil {
+		panic(err)
+	}
 
 	client := xrpc.Client{
 		Host: "https://bsky.social",
@@ -69,13 +70,4 @@ func main() {
 	// }
 	fmt.Println("Starting")
 	subscription.Subscribe(ctx, fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos", os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT")), firehoseListeners)
-
-	test := feeddb.Author{
-		Did:                    "",
-		MedianLikeCount:        0,
-		MedianReplyCount:       0,
-		MedianDirectReplyCount: 0,
-		MedianInteractionCount: 0,
-	}
-	fmt.Println((test))
 }

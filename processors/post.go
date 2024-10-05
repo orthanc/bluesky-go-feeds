@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
-	"github.com/orthanc/feedgenerator/feeddb"
+	writeSchema "github.com/orthanc/feedgenerator/database/write"
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
@@ -29,13 +29,12 @@ func (processor *PostProcessor) Process(event subscription.FirehoseEvent) {
 			replyRootAuthor = getAuthorFromPostUri(replyRoot)
 		}
 	}
-	tx, error := processor.Database.DB.Begin()
+	updates, tx, error := processor.Database.BeginTx(processor.Ctx)
 	if error != nil {
 		panic(error)
 	}
 	defer tx.Rollback()
-	qtx := processor.Database.Queries.WithTx((tx))
-	qtx.SavePost(processor.Ctx, feeddb.SavePostParams{
+	updates.SavePost(processor.Ctx, writeSchema.SavePostParams{
 		Uri:               event.Uri,
 		Author:            event.Author,
 		ReplyParent:       toNullString(replyParent),
