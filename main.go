@@ -28,7 +28,7 @@ func main() {
 	client := xrpc.Client{
 		Host: "https://bsky.social",
 	}
-	allFollowing := following.New(
+	allFollowing := following.NewAllFollowing(
 		ctx,
 		database,
 		&client,

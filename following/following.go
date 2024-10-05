@@ -17,27 +17,27 @@ import (
 )
 
 type AllFollowing struct {
-	ctx context.Context
+	ctx      context.Context
 	database *database.Database
-	client *xrpc.Client
+	client   *xrpc.Client
 
-	UserDids map[string]bool
+	UserDids         map[string]bool
 	FollowingRecords map[string]schema.Following
-	FollowedByCount map[string]int
+	FollowedByCount  map[string]int
 }
 
-func New(ctx context.Context, database *database.Database, client *xrpc.Client) AllFollowing {
-	return AllFollowing{
-		ctx: ctx,
-		database: database,
-		client: client,
-		UserDids: make(map[string]bool),
+func NewAllFollowing(ctx context.Context, database *database.Database, client *xrpc.Client) *AllFollowing {
+	return &AllFollowing{
+		ctx:              ctx,
+		database:         database,
+		client:           client,
+		UserDids:         make(map[string]bool),
 		FollowingRecords: make(map[string]schema.Following),
-		FollowedByCount: make(map[string]int),
+		FollowedByCount:  make(map[string]int),
 	}
 }
 
-func  (allFollowing *AllFollowing) addFollowData(record schema.Following) {
+func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 	if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
 		return
 	}
@@ -45,8 +45,8 @@ func  (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 	allFollowing.FollowedByCount[record.Following]++
 }
 
-func  (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
-	record, ok := allFollowing.FollowingRecords[uri];
+func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
+	record, ok := allFollowing.FollowingRecords[uri]
 	if ok {
 		allFollowing.FollowedByCount[record.Following]--
 		if allFollowing.FollowedByCount[record.Following] <= 0 {
@@ -58,7 +58,7 @@ func  (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Followin
 }
 
 func (allFollowing *AllFollowing) Hydrate() {
-	userDids, err := allFollowing.database.Queries.ListAllUsers(allFollowing.ctx);
+	userDids, err := allFollowing.database.Queries.ListAllUsers(allFollowing.ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -70,7 +70,7 @@ func (allFollowing *AllFollowing) Hydrate() {
 	if err != nil {
 		panic(err)
 	}
-	for _, followingRecord :=  range followingRecords {
+	for _, followingRecord := range followingRecords {
 		allFollowing.addFollowData(followingRecord)
 	}
 }
@@ -81,7 +81,7 @@ func (allFollowing *AllFollowing) saveFollowingPage(records []schema.Following) 
 		panic(err)
 	}
 	defer tx.Rollback()
-	
+
 	for _, record := range records {
 		if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
 			continue
@@ -91,11 +91,11 @@ func (allFollowing *AllFollowing) saveFollowingPage(records []schema.Following) 
 		}
 
 		author := writeSchema.SaveAuthorParams{
-			Did: record.Following,
+			Did:                    record.Following,
 			MedianDirectReplyCount: 0,
 			MedianInteractionCount: 0,
-			MedianLikeCount: 0,
-			MedianReplyCount: 0,
+			MedianLikeCount:        0,
+			MedianReplyCount:       0,
 		}
 		if err := updates.SaveAuthor(allFollowing.ctx, author); err != nil {
 			panic(err)
@@ -109,7 +109,7 @@ func (allFollowing *AllFollowing) saveFollowingPage(records []schema.Following) 
 
 func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string) {
 	user := writeSchema.SaveUserParams{
-		UserDid: userDid,
+		UserDid:  userDid,
 		LastSeen: lastSeen,
 	}
 	if err := allFollowing.database.Updates.SaveUser(allFollowing.ctx, user); err != nil {
@@ -118,7 +118,7 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 	allFollowing.UserDids[userDid] = true
 
 	follows := make([]schema.Following, 0, 100)
-	for cursor := "";; {
+	for cursor := ""; ; {
 		followResult, err := atproto.RepoListRecords(allFollowing.ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, userDid, false, "", "")
 		if err != nil {
 			panic(err)
@@ -127,16 +127,16 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 		follows = follows[:len(followResult.Records)]
 		for i, record := range followResult.Records {
 			follows[i] = schema.Following{
-				Uri: record.Uri,
-				Following: record.Value.Val.(*bsky.GraphFollow).Subject,
-				FollowedBy: userDid,
+				Uri:                  record.Uri,
+				Following:            record.Value.Val.(*bsky.GraphFollow).Subject,
+				FollowedBy:           userDid,
 				UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 			}
 		}
 		allFollowing.saveFollowingPage(follows)
 		fmt.Println("Saved Page")
-		if (followResult.Cursor == nil) {
-			break;
+		if followResult.Cursor == nil {
+			break
 		}
 		cursor = *followResult.Cursor
 	}
@@ -144,9 +144,9 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 
 func (allFollowing *AllFollowing) RecordFollow(uri string, followedBy string, following string) {
 	record := schema.Following{
-		Uri: uri,
-		Following: following,
-		FollowedBy: followedBy,
+		Uri:                  uri,
+		Following:            following,
+		FollowedBy:           followedBy,
 		UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 	}
 

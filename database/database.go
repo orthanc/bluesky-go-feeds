@@ -19,7 +19,7 @@ import (
 var embedMigrations embed.FS
 
 type Database struct {
-	readDB *sql.DB
+	readDB  *sql.DB
 	writeDB *sql.DB
 	Queries *read.Queries
 	Updates *write.Queries
@@ -63,18 +63,18 @@ func NewDatabase(ctx context.Context) (*Database, error) {
 	readDB.SetMaxOpenConns(max(4, runtime.NumCPU()))
 
 	database := Database{
-		readDB: readDB,
+		readDB:  readDB,
 		writeDB: writeDB,
 		Queries: read.New(readDB),
 		Updates: write.New(writeDB),
 	}
-	return &database, nil;
+	return &database, nil
 }
 
 func (database *Database) BeginTx(ctx context.Context) (*write.Queries, *sql.Tx, error) {
 	tx, err := database.writeDB.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error starting transaction: %s", err);
+		return nil, nil, fmt.Errorf("error starting transaction: %s", err)
 	}
 	qtx := database.Updates.WithTx(tx)
 	return qtx, tx, nil

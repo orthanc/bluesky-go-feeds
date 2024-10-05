@@ -10,7 +10,7 @@ import (
 )
 
 type PostProcessor struct {
-	Ctx context.Context
+	Ctx      context.Context
 	Database *database.Database
 }
 
