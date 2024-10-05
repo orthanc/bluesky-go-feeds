@@ -1,3 +1,13 @@
+-- name: GetCursor :many
+select
+  *
+from
+  sub_state
+where
+  "service" = ?
+limit
+  1;
+
 -- name: ListPosts :many
 SELECT
   "author",

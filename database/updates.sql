@@ -1,3 +1,12 @@
+-- name: SaveCursor :exec
+insert into
+  sub_state ("service", "cursor")
+values
+  (?, ?) on conflict do
+update
+set
+  "cursor" = excluded."cursor";
+
 -- name: SavePost :exec
 insert into
   post (
@@ -23,7 +32,7 @@ values
   (?, ?) on conflict do
 update
 set
-  lastSeen = excluded.lastSeen;
+  "lastSeen" = excluded."lastSeen";
 
 -- name: UpdateUserLastSeen :execrows
 update user

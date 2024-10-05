@@ -53,6 +53,26 @@ func (q *Queries) SaveAuthor(ctx context.Context, arg SaveAuthorParams) error {
 	return err
 }
 
+const saveCursor = `-- name: SaveCursor :exec
+insert into
+  sub_state ("service", "cursor")
+values
+  (?, ?) on conflict do
+update
+set
+  "cursor" = excluded."cursor"
+`
+
+type SaveCursorParams struct {
+	Service string
+	Cursor  int64
+}
+
+func (q *Queries) SaveCursor(ctx context.Context, arg SaveCursorParams) error {
+	_, err := q.db.ExecContext(ctx, saveCursor, arg.Service, arg.Cursor)
+	return err
+}
+
 const saveFollowing = `-- name: SaveFollowing :exec
 insert into
   following (
@@ -174,7 +194,7 @@ values
   (?, ?) on conflict do
 update
 set
-  lastSeen = excluded.lastSeen
+  "lastSeen" = excluded."lastSeen"
 `
 
 type SaveUserParams struct {

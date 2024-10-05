@@ -10,6 +10,40 @@ import (
 	"database/sql"
 )
 
+const getCursor = `-- name: GetCursor :many
+select
+  service, cursor
+from
+  sub_state
+where
+  "service" = ?
+limit
+  1
+`
+
+func (q *Queries) GetCursor(ctx context.Context, service string) ([]SubState, error) {
+	rows, err := q.db.QueryContext(ctx, getCursor, service)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SubState
+	for rows.Next() {
+		var i SubState
+		if err := rows.Scan(&i.Service, &i.Cursor); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLastSession = `-- name: GetLastSession :many
 select
   sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
