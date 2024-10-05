@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/orthanc/feedgenerator/database"
+	writeSchema "github.com/orthanc/feedgenerator/database/write"
 
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/atproto/data"
@@ -63,13 +66,8 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	}
 }
 
-func Subscribe(ctx context.Context, url string, listeners map[string]FirehoseEventListener) {
-	dialer := websocket.DefaultDialer
-	con, _, err := dialer.Dial(url, http.Header{})
-	if err != nil {
-		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %w", err))
-	}
-
+func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
+	eventCountSinceSync := 0
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
 			for _, op := range evt.Ops {
@@ -85,12 +83,41 @@ func Subscribe(ctx context.Context, url string, listeners map[string]FirehoseEve
 					listener(event)
 				}
 			}
+			eventCountSinceSync++
+			if eventCountSinceSync >= 1000 {
+				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
+					Service: service,
+					Cursor:  evt.Seq,
+				})
+				eventCountSinceSync = 0
+			}
 			return nil
 		},
 	}
-	scheduler := sequential.NewScheduler("test", rsc.EventHandler)
+	for {
+		queryString := ""
+		cursorResult, err := database.Queries.GetCursor(ctx, service)
+		if err != nil {
+			return fmt.Errorf("unable to load cursor: %w", err)
+		}
+		if len(cursorResult) > 0 {
+			queryString = fmt.Sprintf("?cursor=%d", cursorResult[0].Cursor)
+		}
+		dialer := websocket.DefaultDialer
+		uri := fmt.Sprintf("Connecting to %s/xrpc/com.atproto.sync.subscribeRepos%s", service, queryString)
+		fmt.Println(uri)
+		con, _, err := dialer.Dial(uri, http.Header{})
+		if err != nil {
+			return fmt.Errorf("subscribing to firehose failed (dialing): %w", err)
+		}
 
-	events.HandleRepoStream(ctx, con, scheduler)
+		scheduler := sequential.NewScheduler("test", rsc.EventHandler)
 
-	fmt.Println("hi")
+		eventCountSinceSync = 0
+		err = events.HandleRepoStream(ctx, con, scheduler)
+		if err != nil {
+			fmt.Printf("Error from repo stream: %s\n", err)
+			time.Sleep(time.Duration(5) * time.Second)
+		}
+	}
 }

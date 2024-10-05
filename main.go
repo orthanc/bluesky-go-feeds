@@ -90,5 +90,8 @@ func main() {
 	// 	// fmt.Println(event)
 	// }
 	fmt.Println("Starting")
-	subscription.Subscribe(ctx, fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos", os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT")), firehoseListeners)
+	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
+	if err != nil {
+		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
+	}
 }
