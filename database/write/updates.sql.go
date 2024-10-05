@@ -11,7 +11,9 @@ import (
 )
 
 const deleteFollowing = `-- name: DeleteFollowing :exec
-delete from following where uri = ?
+delete from following
+where
+  uri = ?
 `
 
 func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
@@ -130,14 +132,49 @@ func (q *Queries) SavePost(ctx context.Context, arg SavePostParams) error {
 	return err
 }
 
-const saveUser = `-- name: SaveUser :exec
+const saveSession = `-- name: SaveSession :exec
 insert into
-  user (
+  session (
     "userDid",
-    "lastSeen"
+    "startedAt",
+    "postsSince",
+    "lastSeen",
+    "accessCount",
+    "algo"
   )
 values
-  (?, ?) on conflict do update set lastSeen = excluded.lastSeen
+  (?, ?, ?, ?, ?, ?)
+`
+
+type SaveSessionParams struct {
+	UserDid     string
+	StartedAt   string
+	PostsSince  string
+	LastSeen    string
+	AccessCount sql.NullFloat64
+	Algo        sql.NullString
+}
+
+func (q *Queries) SaveSession(ctx context.Context, arg SaveSessionParams) error {
+	_, err := q.db.ExecContext(ctx, saveSession,
+		arg.UserDid,
+		arg.StartedAt,
+		arg.PostsSince,
+		arg.LastSeen,
+		arg.AccessCount,
+		arg.Algo,
+	)
+	return err
+}
+
+const saveUser = `-- name: SaveUser :exec
+insert into
+  user ("userDid", "lastSeen")
+values
+  (?, ?) on conflict do
+update
+set
+  lastSeen = excluded.lastSeen
 `
 
 type SaveUserParams struct {
@@ -148,4 +185,44 @@ type SaveUserParams struct {
 func (q *Queries) SaveUser(ctx context.Context, arg SaveUserParams) error {
 	_, err := q.db.ExecContext(ctx, saveUser, arg.UserDid, arg.LastSeen)
 	return err
+}
+
+const updateSessionLastSeen = `-- name: UpdateSessionLastSeen :exec
+update session
+set
+  "lastSeen" = ?,
+  "accessCount" = "accessCount" + 1
+where
+  "sessionId" = ?
+`
+
+type UpdateSessionLastSeenParams struct {
+	LastSeen  string
+	SessionId int64
+}
+
+func (q *Queries) UpdateSessionLastSeen(ctx context.Context, arg UpdateSessionLastSeenParams) error {
+	_, err := q.db.ExecContext(ctx, updateSessionLastSeen, arg.LastSeen, arg.SessionId)
+	return err
+}
+
+const updateUserLastSeen = `-- name: UpdateUserLastSeen :execrows
+update user
+set
+  "lastSeen" = ?
+where
+  "userDid" = ?
+`
+
+type UpdateUserLastSeenParams struct {
+	LastSeen string
+	UserDid  string
+}
+
+func (q *Queries) UpdateUserLastSeen(ctx context.Context, arg UpdateUserLastSeenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserLastSeen, arg.LastSeen, arg.UserDid)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

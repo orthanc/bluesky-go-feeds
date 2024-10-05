@@ -10,8 +10,64 @@ import (
 	"database/sql"
 )
 
+const getLastSession = `-- name: GetLastSession :many
+select
+  sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
+from
+  session
+where
+  "userDid" = ?
+  and (
+    "algo" = ?
+    OR "algo" is null
+  )
+order by
+  "lastSeen" desc
+limit
+  1
+`
+
+type GetLastSessionParams struct {
+	UserDid string
+	Algo    sql.NullString
+}
+
+func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, getLastSession, arg.UserDid, arg.Algo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.SessionId,
+			&i.UserDid,
+			&i.StartedAt,
+			&i.PostsSince,
+			&i.LastSeen,
+			&i.AccessCount,
+			&i.Algo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllFollowing = `-- name: ListAllFollowing :many
-select uri, followedBy, "following", userInteractionRatio from following
+select
+  uri, followedBy, "following", userInteractionRatio
+from
+  following
 `
 
 func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
@@ -43,7 +99,10 @@ func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
 }
 
 const listAllUsers = `-- name: ListAllUsers :many
-select "userDid" FROM user
+select
+  "userDid"
+FROM
+  user
 `
 
 func (q *Queries) ListAllUsers(ctx context.Context) ([]string, error) {
@@ -70,17 +129,20 @@ func (q *Queries) ListAllUsers(ctx context.Context) ([]string, error) {
 }
 
 const listPosts = `-- name: ListPosts :many
-SELECT "author",
-    "directReplyCount",
-    "indexedAt",
-    "interactionCount",
-    "likeCount",
-    "replyCount",
-    "uri",
-    "replyParent",
-    "replyParentAuthor",
-    "replyRoot",
-    "replyRootAuthor" FROM post
+SELECT
+  "author",
+  "directReplyCount",
+  "indexedAt",
+  "interactionCount",
+  "likeCount",
+  "replyCount",
+  "uri",
+  "replyParent",
+  "replyParentAuthor",
+  "replyRoot",
+  "replyRootAuthor"
+FROM
+  post
 `
 
 type ListPostsRow struct {

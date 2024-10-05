@@ -2,12 +2,13 @@ package web
 
 import (
 	"github.com/bluesky-social/indigo/api/bsky"
+	schema "github.com/orthanc/feedgenerator/database/read"
 )
 
-type algorithm = func(userDid string) (bsky.FeedGetFeedSkeleton_Output, error)
+type algorithm = func(session schema.Session) (bsky.FeedGetFeedSkeleton_Output, error)
 
 var algorithms = map[string]algorithm{
-	"replies-foll": func(_ string) (bsky.FeedGetFeedSkeleton_Output, error) {
+	"replies-foll": func(_ schema.Session) (bsky.FeedGetFeedSkeleton_Output, error) {
 		return bsky.FeedGetFeedSkeleton_Output{
 			Feed: []*bsky.FeedDefs_SkeletonFeedPost{
 				{

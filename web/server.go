@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/following"
 )
 
 func wellKnownDidHandler(w http.ResponseWriter, r *http.Request) {
@@ -44,10 +46,10 @@ func describeFeedGenerator(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func StartServer() {
+func StartServer(database *database.Database, syncFollowingChan chan following.SyncFollowingParams) {
 	http.HandleFunc("GET /.well-known/did.json", wellKnownDidHandler)
 	http.HandleFunc("GET /xrpc/app.bsky.feed.describeFeedGenerator", describeFeedGenerator)
-	http.HandleFunc("GET /xrpc/app.bsky.feed.getFeedSkeleton", getFeedSkeleton)
+	http.Handle("GET /xrpc/app.bsky.feed.getFeedSkeleton", NewGetFeedSkeleton(database, syncFollowingChan))
 
 	fmt.Printf("Starting server on %s:%s\n", os.Getenv("FEEDGEN_LISTENHOST"), os.Getenv("FEEDGEN_PORT"))
 	err := http.ListenAndServe(fmt.Sprintf("%s:%s", os.Getenv("FEEDGEN_LISTENHOST"), os.Getenv("FEEDGEN_PORT")), nil)

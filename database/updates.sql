@@ -18,12 +18,40 @@ values
 
 -- name: SaveUser :exec
 insert into
-  user (
+  user ("userDid", "lastSeen")
+values
+  (?, ?) on conflict do
+update
+set
+  lastSeen = excluded.lastSeen;
+
+-- name: UpdateUserLastSeen :execrows
+update user
+set
+  "lastSeen" = ?
+where
+  "userDid" = ?;
+
+-- name: SaveSession :exec
+insert into
+  session (
     "userDid",
-    "lastSeen"
+    "startedAt",
+    "postsSince",
+    "lastSeen",
+    "accessCount",
+    "algo"
   )
 values
-  (?, ?) on conflict do update set lastSeen = excluded.lastSeen;
+  (?, ?, ?, ?, ?, ?);
+
+-- name: UpdateSessionLastSeen :exec
+update session
+set
+  "lastSeen" = ?,
+  "accessCount" = "accessCount" + 1
+where
+  "sessionId" = ?;
 
 -- name: SaveFollowing :exec
 insert into
@@ -36,9 +64,10 @@ insert into
 values
   (?, ?, ?, ?) on conflict do nothing;
 
-
 -- name: DeleteFollowing :exec
-delete from following where uri = ?;
+delete from following
+where
+  uri = ?;
 
 -- name: SaveAuthor :exec
 insert into

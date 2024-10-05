@@ -26,6 +26,11 @@ type AllFollowing struct {
 	FollowedByCount  map[string]int
 }
 
+type SyncFollowingParams struct {
+	UserDid  string
+	LastSeen string
+}
+
 func NewAllFollowing(ctx context.Context, database *database.Database, client *xrpc.Client) *AllFollowing {
 	return &AllFollowing{
 		ctx:              ctx,
@@ -107,19 +112,16 @@ func (allFollowing *AllFollowing) saveFollowingPage(records []schema.Following) 
 	tx.Commit()
 }
 
-func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string) {
-	user := writeSchema.SaveUserParams{
-		UserDid:  userDid,
-		LastSeen: lastSeen,
-	}
+func (allFollowing *AllFollowing) SyncFollowing(params SyncFollowingParams) {
+	user := writeSchema.SaveUserParams(params)
 	if err := allFollowing.database.Updates.SaveUser(allFollowing.ctx, user); err != nil {
 		panic(err)
 	}
-	allFollowing.UserDids[userDid] = true
+	allFollowing.UserDids[user.UserDid] = true
 
 	follows := make([]schema.Following, 0, 100)
 	for cursor := ""; ; {
-		followResult, err := atproto.RepoListRecords(allFollowing.ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, userDid, false, "", "")
+		followResult, err := atproto.RepoListRecords(allFollowing.ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, user.UserDid, false, "", "")
 		if err != nil {
 			panic(err)
 		}
@@ -129,7 +131,7 @@ func (allFollowing *AllFollowing) SyncFollowers(userDid string, lastSeen string)
 			follows[i] = schema.Following{
 				Uri:                  record.Uri,
 				Following:            record.Value.Val.(*bsky.GraphFollow).Subject,
-				FollowedBy:           userDid,
+				FollowedBy:           user.UserDid,
 				UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 			}
 		}

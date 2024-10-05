@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 
@@ -11,11 +12,21 @@ import (
 	"github.com/bluesky-social/indigo/repomgr"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/orthanc/feedgenerator/database"
+	schema "github.com/orthanc/feedgenerator/database/read"
 	"github.com/orthanc/feedgenerator/following"
 	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
 	"github.com/orthanc/feedgenerator/web"
 )
+
+func backgroundJobs(following *following.AllFollowing, syncFollowingChan chan following.SyncFollowingParams) {
+	for {
+		select {
+		case syncFollowingParams := <-syncFollowingChan:
+			following.SyncFollowing(syncFollowingParams)
+		}
+	}
+}
 
 func main() {
 	ctx := context.Background()
@@ -24,6 +35,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+
+	lastSession, err := database.Queries.GetLastSession(ctx, schema.GetLastSessionParams{
+		UserDid: "aaaa",
+		Algo: sql.NullString{String: "1234", Valid: true},
+	})
+	fmt.Println(lastSession, err)
 
 	client := xrpc.Client{
 		Host: "https://bsky.social",
@@ -35,7 +53,10 @@ func main() {
 	)
 	allFollowing.Hydrate()
 
-	go web.StartServer()
+	syncFollowingChan := make(chan following.SyncFollowingParams)
+	go backgroundJobs(allFollowing, syncFollowingChan)
+
+	go web.StartServer(database, syncFollowingChan)
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = func(event subscription.FirehoseEvent) {

@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"database/sql"
 	"strings"
 
 	"github.com/orthanc/feedgenerator/subscription"
@@ -19,11 +18,4 @@ func getAuthorFromPostUri(postUri string) string {
 		return ""
 	}
 	return repo
-}
-
-func toNullString(val string) sql.NullString {
-	if val == "" {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: val, Valid: true}
 }
