@@ -108,8 +108,8 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 			queryString = fmt.Sprintf("?cursor=%d", cursorResult[0].Cursor)
 		}
 		dialer := websocket.DefaultDialer
-		uri := fmt.Sprintf("Connecting to %s/xrpc/com.atproto.sync.subscribeRepos%s", service, queryString)
-		fmt.Println(uri)
+		uri := fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos%s", service, queryString)
+		fmt.Printf("Connecting to %s\n", uri)
 		con, _, err := dialer.Dial(uri, http.Header{})
 		if err != nil {
 			return fmt.Errorf("subscribing to firehose failed (dialing): %w", err)
