@@ -9,7 +9,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/bluesky-social/indigo/repomgr"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/orthanc/feedgenerator/database"
 	schema "github.com/orthanc/feedgenerator/database/read"
@@ -36,10 +35,9 @@ func main() {
 		panic(err)
 	}
 
-
 	lastSession, err := database.Queries.GetLastSession(ctx, schema.GetLastSessionParams{
 		UserDid: "aaaa",
-		Algo: sql.NullString{String: "1234", Valid: true},
+		Algo:    sql.NullString{String: "1234", Valid: true},
 	})
 	fmt.Println(lastSession, err)
 
@@ -59,33 +57,13 @@ func main() {
 	go web.StartServer(database, syncFollowingChan)
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
-	firehoseListeners["app.bsky.graph.follow"] = func(event subscription.FirehoseEvent) {
-		switch event.EventKind {
-		case repomgr.EvtKindCreateRecord:
-			if allFollowing.UserDids[event.Author] {
-				fmt.Println(allFollowing.FollowedByCount[event.Record["subject"].(string)])
-				fmt.Println(allFollowing.FollowingRecords[event.Uri])
-				allFollowing.RecordFollow(event.Uri, event.Author, event.Record["subject"].(string))
-				fmt.Printf("Record Following %s %s => %s\n", event.Uri, event.Author, event.Record["subject"].(string))
-				fmt.Println(allFollowing.FollowedByCount[event.Record["subject"].(string)])
-				fmt.Println(allFollowing.FollowingRecords[event.Uri])
-			}
-		case repomgr.EvtKindDeleteRecord:
-			if allFollowing.UserDids[event.Author] {
-				fmt.Println(allFollowing.FollowedByCount["did:plc:k626emd4xi4h3wxpd44s4wpk"])
-				fmt.Println(allFollowing.FollowingRecords[event.Uri])
-				allFollowing.RemoveFollow(event.Uri)
-				fmt.Printf("Remove Following %s %s\n", event.Uri, event.Author)
-				fmt.Println(allFollowing.FollowedByCount["did:plc:k626emd4xi4h3wxpd44s4wpk"])
-				fmt.Println(allFollowing.FollowingRecords[event.Uri])
-			}
-		}
-	}
-	postProcessor := processor.PostProcessor{
-		Ctx:      ctx,
+	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{
+		Database:     database,
+		AllFollowing: allFollowing,
+	}).Process
+	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
 		Database: database,
-	}
-	firehoseListeners["app.bsky.feed.post"] = postProcessor.Process
+	}).Process
 	// firehoseListeners["app.bsky.feed.like"] = func(event firehoseEvent) {
 	// 	// fmt.Println(event)
 	// }

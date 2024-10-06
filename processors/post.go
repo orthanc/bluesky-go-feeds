@@ -10,11 +10,10 @@ import (
 )
 
 type PostProcessor struct {
-	Ctx      context.Context
 	Database *database.Database
 }
 
-func (processor *PostProcessor) Process(event subscription.FirehoseEvent) {
+func (processor *PostProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) {
 	var replyParent, replyParentAuthor, replyRoot, replyRootAuthor string
 	reply := event.Record["reply"]
 	if reply != nil {
@@ -29,12 +28,12 @@ func (processor *PostProcessor) Process(event subscription.FirehoseEvent) {
 			replyRootAuthor = getAuthorFromPostUri(replyRoot)
 		}
 	}
-	updates, tx, error := processor.Database.BeginTx(processor.Ctx)
+	updates, tx, error := processor.Database.BeginTx(ctx)
 	if error != nil {
 		panic(error)
 	}
 	defer tx.Rollback()
-	updates.SavePost(processor.Ctx, writeSchema.SavePostParams{
+	updates.SavePost(ctx, writeSchema.SavePostParams{
 		Uri:               event.Uri,
 		Author:            event.Author,
 		ReplyParent:       database.ToNullString(replyParent),

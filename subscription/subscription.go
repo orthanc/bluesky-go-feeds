@@ -30,7 +30,7 @@ type FirehoseEvent struct {
 	Record     map[string]any
 }
 
-type FirehoseEventListener func(FirehoseEvent)
+type FirehoseEventListener func(context.Context, FirehoseEvent)
 
 func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op *atproto.SyncSubscribeRepos_RepoOp) (FirehoseEvent, error) {
 	parts := strings.SplitN(op.Path, "/", 3)
@@ -80,7 +80,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 						fmt.Println(err)
 						continue
 					}
-					listener(event)
+					listener(ctx, event)
 				}
 			}
 			eventCountSinceSync++

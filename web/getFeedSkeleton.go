@@ -110,9 +110,6 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			return
 		}
 	}
-	fmt.Println(lastSession)
-	// FIXME make sure posts since is correctly populated
-	fmt.Println(lastSession.PostsSince)
 
 	result, err := alg(lastSession)
 	if err != nil {
