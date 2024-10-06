@@ -35,10 +35,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
-		if !(processor.AllFollowing.FollowedByCount[event.Author] > 0 ||
-			processor.AllFollowing.FollowedByCount[replyParentAuthor] > 0 ||
+		if !(processor.AllFollowing.IsFollowed(event.Author) ||
+			processor.AllFollowing.IsFollowed(replyParentAuthor) ||
 			processor.AllFollowing.IsUser(replyParentAuthor) ||
-			processor.AllFollowing.FollowedByCount[replyRootAuthor] > 0 ||
+			processor.AllFollowing.IsFollowed(replyRootAuthor) ||
 			processor.AllFollowing.IsUser(replyRootAuthor)) {
 			return nil
 		}
@@ -49,7 +49,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().Format(time.RFC3339)
-		if processor.AllFollowing.FollowedByCount[event.Author] > 0 {
+		if processor.AllFollowing.IsFollowed(event.Author) {
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,
 				Author:            event.Author,
@@ -67,7 +67,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				return err
 			}
 		}
-		if processor.AllFollowing.FollowedByCount[replyParentAuthor] > 0 {
+		if processor.AllFollowing.IsFollowed(replyParentAuthor) {
 			err := updates.IncrementPostDirectReply(ctx, event.Uri)
 			if err != nil {
 				return err
@@ -108,7 +108,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			return nil
 		}
 
-		if processor.AllFollowing.FollowedByCount[replyRootAuthor] > 0 {
+		if processor.AllFollowing.IsFollowed(replyRootAuthor) {
 			err := updates.IncrementPostIndirectReply(ctx, event.Uri)
 			if err != nil {
 				return err

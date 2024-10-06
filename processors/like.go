@@ -24,7 +24,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
 		if !(processor.AllFollowing.IsUser(postAuthor) ||
-			processor.AllFollowing.FollowedByCount[postAuthor] > 0) {
+			processor.AllFollowing.IsFollowed(postAuthor)) {
 			return nil
 		}
 
@@ -34,7 +34,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().Format(time.RFC3339)
-		if processor.AllFollowing.FollowedByCount[postAuthor] > 0 {
+		if processor.AllFollowing.IsFollowed(postAuthor) {
 			err := updates.IncrementPostLike(ctx, postUri)
 			if err != nil {
 				return err

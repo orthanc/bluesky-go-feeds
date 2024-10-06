@@ -23,7 +23,7 @@ type AllFollowing struct {
 
 	userDids         sync.Map
 	FollowingRecords map[string]schema.Following
-	FollowedByCount  map[string]int
+	followedByCount  sync.Map
 }
 
 type SyncFollowingParams struct {
@@ -36,16 +36,18 @@ func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollo
 		database:         database,
 		client:           client,
 		FollowingRecords: make(map[string]schema.Following),
-		FollowedByCount:  make(map[string]int),
 	}
 }
 
 func (allFollowing *AllFollowing) IsUser(userDid string) bool {
 	value, present := allFollowing.userDids.Load(userDid)
-	if present {
-		return value.(bool)
-	}
-	return false
+	return present && value.(bool)
+}
+
+
+func (allFollowing *AllFollowing) IsFollowed(authorDid string) bool {
+	value, present := allFollowing.followedByCount.Load(authorDid)
+	return present && value.(int) > 0
 }
 
 func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
@@ -53,15 +55,35 @@ func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 		return
 	}
 	allFollowing.FollowingRecords[record.Uri] = record
-	allFollowing.FollowedByCount[record.Following]++
+	for {
+		current, _ := allFollowing.followedByCount.LoadOrStore(record.Following, 0)
+		swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int) + 1)
+		if swapped {
+			break
+		}
+	}
 }
 
 func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
 	record, ok := allFollowing.FollowingRecords[uri]
 	if ok {
-		allFollowing.FollowedByCount[record.Following]--
-		if allFollowing.FollowedByCount[record.Following] <= 0 {
-			delete(allFollowing.FollowedByCount, record.Following)
+		for {
+			current, present := allFollowing.followedByCount.Load(record.Following)
+			if !present {
+				break
+			}
+			newVal := current.(int) - 1
+			if newVal > 0 {
+				swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int) - 1)
+				if swapped {
+					break
+				}
+			} else  {
+				deleted := allFollowing.followedByCount.CompareAndDelete(record.Following, current)
+				if deleted {
+					break
+				}
+			}
 		}
 		delete(allFollowing.FollowingRecords, uri)
 	}
