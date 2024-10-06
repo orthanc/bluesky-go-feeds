@@ -25,24 +25,20 @@ type Database struct {
 	Updates *write.Queries
 }
 
-func connect(ctx context.Context) (*sql.DB, error) {
+func connect(ctx context.Context, extraParams string) (*sql.DB, error) {
 	dbLocation := os.Getenv("FEEDGEN_SQLITE_LOCATION")
-	db, err := sql.Open("sqlite3", fmt.Sprintf("%s?_txlock=immediate", dbLocation))
+	// https://kerkour.com/sqlite-for-servers
+	db, err := sql.Open("sqlite3", fmt.Sprintf("%s?_txlock=immediate&_journal=WAL&_timeout=5000&_sync=1&_cache_size=1000000000&_fk=true%s", dbLocation, extraParams))
 	if err != nil {
 		return nil, fmt.Errorf("error creating db at %s: %s", dbLocation, err)
 	}
 	// https://kerkour.com/sqlite-for-servers
-	db.ExecContext(ctx, "PRAGMA journal_mode = WAL")
-	db.ExecContext(ctx, "PRAGMA busy_timeout = 5000")
-	db.ExecContext(ctx, "PRAGMA synchronous = NORMAL")
-	db.ExecContext(ctx, "PRAGMA cache_size = 1000000000")
-	db.ExecContext(ctx, "PRAGMA foreign_keys = true")
 	db.ExecContext(ctx, "PRAGMA temp_store = memory")
 	return db, nil
 }
 
 func NewDatabase(ctx context.Context) (*Database, error) {
-	writeDB, err := connect(ctx)
+	writeDB, err := connect(ctx, "")
 	if err != nil {
 		return nil, fmt.Errorf("error creating write db:%s", err)
 	}
@@ -56,7 +52,7 @@ func NewDatabase(ctx context.Context) (*Database, error) {
 		return nil, fmt.Errorf("error updating schema: %s", err)
 	}
 
-	readDB, err := connect(ctx)
+	readDB, err := connect(ctx, "&mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("error creating read db: %s", err)
 	}
