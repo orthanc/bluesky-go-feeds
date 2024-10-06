@@ -7,11 +7,13 @@ import (
 	"github.com/bluesky-social/indigo/repomgr"
 	"github.com/orthanc/feedgenerator/database"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
+	"github.com/orthanc/feedgenerator/following"
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
 type PostProcessor struct {
-	Database *database.Database
+	AllFollowing *following.AllFollowing
+	Database     *database.Database
 }
 
 func (processor *PostProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
@@ -31,24 +33,116 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
 			}
 		}
+
+		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
+		if !(processor.AllFollowing.FollowedByCount[event.Author] > 0 ||
+			processor.AllFollowing.FollowedByCount[replyParentAuthor] > 0 ||
+			processor.AllFollowing.UserDids[replyParentAuthor] ||
+			processor.AllFollowing.FollowedByCount[replyRootAuthor] > 0 ||
+			processor.AllFollowing.UserDids[replyRootAuthor]) {
+			return nil
+		}
+
 		updates, tx, err := processor.Database.BeginTx(ctx)
 		if err != nil {
 			return err
 		}
 		defer tx.Rollback()
-		updates.SavePost(ctx, writeSchema.SavePostParams{
-			Uri:               event.Uri,
-			Author:            event.Author,
-			ReplyParent:       database.ToNullString(replyParent),
-			ReplyParentAuthor: database.ToNullString(replyParentAuthor),
-			ReplyRoot:         database.ToNullString(replyRoot),
-			ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
-			IndexedAt:         time.Now().Format(time.RFC3339),
-			DirectReplyCount:  0,
-			InteractionCount:  0,
-			LikeCount:         0,
-			ReplyCount:        0,
-		})
+		indexedAt := time.Now().Format(time.RFC3339)
+		if processor.AllFollowing.FollowedByCount[event.Author] > 0 {
+			err := updates.SavePost(ctx, writeSchema.SavePostParams{
+				Uri:               event.Uri,
+				Author:            event.Author,
+				ReplyParent:       database.ToNullString(replyParent),
+				ReplyParentAuthor: database.ToNullString(replyParentAuthor),
+				ReplyRoot:         database.ToNullString(replyRoot),
+				ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
+				IndexedAt:         indexedAt,
+				DirectReplyCount:  0,
+				InteractionCount:  0,
+				LikeCount:         0,
+				ReplyCount:        0,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		if processor.AllFollowing.FollowedByCount[replyParentAuthor] > 0 {
+			err := updates.IncrementPostDirectReply(ctx, event.Uri)
+			if err != nil {
+				return err
+			}
+
+			if processor.AllFollowing.UserDids[event.Author] && event.Author != replyParentAuthor {
+				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
+					InteractionUri: event.Uri,
+					AuthorDid:      replyParentAuthor,
+					UserDid:        event.Author,
+					PostUri:        replyParent,
+					Type:           "reply",
+					IndexedAt:      indexedAt,
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if processor.AllFollowing.UserDids[replyParentAuthor] && event.Author != replyParentAuthor {
+			// Someone replying a post by one of the users
+			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
+				InteractionUri:       event.Uri,
+				InteractionAuthorDid: event.Author,
+				UserDid:              replyParentAuthor,
+				PostUri:              replyParent,
+				Type:                 "reply",
+				IndexedAt:            indexedAt,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		// We don't want to double process direct replies so everything after this only applies if
+		// the reply parent and reply root are different
+		if replyParent == replyRoot {
+			return nil
+		}
+
+		if processor.AllFollowing.FollowedByCount[replyRootAuthor] > 0 {
+			err := updates.IncrementPostIndirectReply(ctx, event.Uri)
+			if err != nil {
+				return err
+			}
+
+			if processor.AllFollowing.UserDids[event.Author] && event.Author != replyRootAuthor {
+				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
+					InteractionUri: event.Uri,
+					AuthorDid:      replyRootAuthor,
+					UserDid:        event.Author,
+					PostUri:        replyRoot,
+					Type:           "threadReply",
+					IndexedAt:      indexedAt,
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if processor.AllFollowing.UserDids[replyRootAuthor] && event.Author != replyRootAuthor {
+			// Someone replying a post by one of the users
+			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
+				InteractionUri:       event.Uri,
+				InteractionAuthorDid: event.Author,
+				UserDid:              replyRootAuthor,
+				PostUri:              replyRoot,
+				Type:                 "threadReply",
+				IndexedAt:            indexedAt,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 		err = tx.Commit()
 		if err != nil {
 			return err

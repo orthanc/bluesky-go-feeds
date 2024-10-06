@@ -25,6 +25,49 @@ insert into
 values
   (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
 
+-- name: IncrementPostDirectReply :exec
+update post
+set
+  "directReplyCount" = "directReplyCount" + 1,
+  "replyCount" = "replyCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?;
+
+-- name: IncrementPostIndirectReply :exec
+update post
+set
+  "replyCount" = "replyCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?;
+
+-- name: SaveUserInteraction :exec
+insert into
+  userInteraction (
+    "interactionUri",
+    "userDid",
+    "type",
+    "authorDid",
+    "postUri",
+    "indexedAt"
+  )
+values
+  (?, ?, ?, ?, ?, ?);
+
+-- name: SaveInteractionWithUser :exec
+insert into
+  interactionWithUser (
+    "interactionUri",
+    "userDid",
+    "type",
+    "interactionAuthorDid",
+    "postUri",
+    "indexedAt"
+  )
+values
+  (?, ?, ?, ?, ?, ?);
+
 -- name: SaveUser :exec
 insert into
   user ("userDid", "lastSeen")

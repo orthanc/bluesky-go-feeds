@@ -21,6 +21,35 @@ func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
 	return err
 }
 
+const incrementPostDirectReply = `-- name: IncrementPostDirectReply :exec
+update post
+set
+  "directReplyCount" = "directReplyCount" + 1,
+  "replyCount" = "replyCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?
+`
+
+func (q *Queries) IncrementPostDirectReply(ctx context.Context, uri string) error {
+	_, err := q.db.ExecContext(ctx, incrementPostDirectReply, uri)
+	return err
+}
+
+const incrementPostIndirectReply = `-- name: IncrementPostIndirectReply :exec
+update post
+set
+  "replyCount" = "replyCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?
+`
+
+func (q *Queries) IncrementPostIndirectReply(ctx context.Context, uri string) error {
+	_, err := q.db.ExecContext(ctx, incrementPostIndirectReply, uri)
+	return err
+}
+
 const saveAuthor = `-- name: SaveAuthor :exec
 insert into
   author (
@@ -98,6 +127,41 @@ func (q *Queries) SaveFollowing(ctx context.Context, arg SaveFollowingParams) er
 		arg.FollowedBy,
 		arg.Following,
 		arg.UserInteractionRatio,
+	)
+	return err
+}
+
+const saveInteractionWithUser = `-- name: SaveInteractionWithUser :exec
+insert into
+  interactionWithUser (
+    "interactionUri",
+    "userDid",
+    "type",
+    "interactionAuthorDid",
+    "postUri",
+    "indexedAt"
+  )
+values
+  (?, ?, ?, ?, ?, ?)
+`
+
+type SaveInteractionWithUserParams struct {
+	InteractionUri       string
+	UserDid              string
+	Type                 string
+	InteractionAuthorDid string
+	PostUri              string
+	IndexedAt            string
+}
+
+func (q *Queries) SaveInteractionWithUser(ctx context.Context, arg SaveInteractionWithUserParams) error {
+	_, err := q.db.ExecContext(ctx, saveInteractionWithUser,
+		arg.InteractionUri,
+		arg.UserDid,
+		arg.Type,
+		arg.InteractionAuthorDid,
+		arg.PostUri,
+		arg.IndexedAt,
 	)
 	return err
 }
@@ -204,6 +268,41 @@ type SaveUserParams struct {
 
 func (q *Queries) SaveUser(ctx context.Context, arg SaveUserParams) error {
 	_, err := q.db.ExecContext(ctx, saveUser, arg.UserDid, arg.LastSeen)
+	return err
+}
+
+const saveUserInteraction = `-- name: SaveUserInteraction :exec
+insert into
+  userInteraction (
+    "interactionUri",
+    "userDid",
+    "type",
+    "authorDid",
+    "postUri",
+    "indexedAt"
+  )
+values
+  (?, ?, ?, ?, ?, ?)
+`
+
+type SaveUserInteractionParams struct {
+	InteractionUri string
+	UserDid        string
+	Type           string
+	AuthorDid      string
+	PostUri        string
+	IndexedAt      string
+}
+
+func (q *Queries) SaveUserInteraction(ctx context.Context, arg SaveUserInteractionParams) error {
+	_, err := q.db.ExecContext(ctx, saveUserInteraction,
+		arg.InteractionUri,
+		arg.UserDid,
+		arg.Type,
+		arg.AuthorDid,
+		arg.PostUri,
+		arg.IndexedAt,
+	)
 	return err
 }
 
