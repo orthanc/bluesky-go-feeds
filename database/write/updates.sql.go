@@ -156,7 +156,7 @@ insert into
     "indexedAt"
   )
 values
-  (?, ?, ?, ?, ?, ?)
+  (?, ?, ?, ?, ?, ?) on conflict do nothing
 `
 
 type SaveInteractionWithUserParams struct {
@@ -296,7 +296,7 @@ insert into
     "indexedAt"
   )
 values
-  (?, ?, ?, ?, ?, ?)
+  (?, ?, ?, ?, ?, ?) on conflict do nothing
 `
 
 type SaveUserInteractionParams struct {

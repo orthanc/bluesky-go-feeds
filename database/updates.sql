@@ -61,7 +61,7 @@ insert into
     "indexedAt"
   )
 values
-  (?, ?, ?, ?, ?, ?);
+  (?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: SaveInteractionWithUser :exec
 insert into
@@ -74,7 +74,7 @@ insert into
     "indexedAt"
   )
 values
-  (?, ?, ?, ?, ?, ?);
+  (?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: SaveUser :exec
 insert into
