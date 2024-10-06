@@ -22,7 +22,7 @@ func backgroundJobs(following *following.AllFollowing, syncFollowingChan chan fo
 	for {
 		select {
 		case syncFollowingParams := <-syncFollowingChan:
-			err := following.SyncFollowing(syncFollowingParams)
+			err := following.SyncFollowing(context.Background(), syncFollowingParams)
 			if err != nil {
 				fmt.Printf("Error syncing follow for %s: %s\n", syncFollowingParams.UserDid, err)
 			}
@@ -48,11 +48,10 @@ func main() {
 		Host: "https://bsky.social",
 	}
 	allFollowing := following.NewAllFollowing(
-		ctx,
 		database,
 		&client,
 	)
-	allFollowing.Hydrate()
+	allFollowing.Hydrate(ctx)
 
 	syncFollowingChan := make(chan following.SyncFollowingParams)
 	go backgroundJobs(allFollowing, syncFollowingChan)

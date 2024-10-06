@@ -18,11 +18,11 @@ func (processor *FollowProcessor) Process(ctx context.Context, event subscriptio
 	switch event.EventKind {
 	case repomgr.EvtKindCreateRecord:
 		if processor.AllFollowing.UserDids[event.Author] {
-			return processor.AllFollowing.RecordFollow(event.Uri, event.Author, event.Record["subject"].(string))
+			return processor.AllFollowing.RecordFollow(ctx, event.Uri, event.Author, event.Record["subject"].(string))
 		}
 	case repomgr.EvtKindDeleteRecord:
 		if processor.AllFollowing.UserDids[event.Author] {
-			return processor.AllFollowing.RemoveFollow(event.Uri)
+			return processor.AllFollowing.RemoveFollow(ctx, event.Uri)
 		}
 	}
 	return nil
