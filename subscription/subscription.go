@@ -30,7 +30,7 @@ type FirehoseEvent struct {
 	Record     map[string]any
 }
 
-type FirehoseEventListener func(context.Context, FirehoseEvent)
+type FirehoseEventListener func(context.Context, FirehoseEvent) error
 
 func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op *atproto.SyncSubscribeRepos_RepoOp) (FirehoseEvent, error) {
 	parts := strings.SplitN(op.Path, "/", 3)
@@ -80,7 +80,11 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 						fmt.Println(err)
 						continue
 					}
-					listener(ctx, event)
+					err = listener(ctx, event)
+					if err != nil {
+						fmt.Printf("Unable to process %s: %s", collection, err)
+						continue
+					}
 				}
 			}
 			eventCountSinceSync++

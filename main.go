@@ -22,7 +22,10 @@ func backgroundJobs(following *following.AllFollowing, syncFollowingChan chan fo
 	for {
 		select {
 		case syncFollowingParams := <-syncFollowingChan:
-			following.SyncFollowing(syncFollowingParams)
+			err := following.SyncFollowing(syncFollowingParams)
+			if err != nil {
+				fmt.Printf("Error syncing follow for %s: %s\n", syncFollowingParams.UserDid, err)
+			}
 		}
 	}
 }

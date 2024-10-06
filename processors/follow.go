@@ -14,15 +14,16 @@ type FollowProcessor struct {
 	Database     *database.Database
 }
 
-func (processor *FollowProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) {
+func (processor *FollowProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
 	switch event.EventKind {
 	case repomgr.EvtKindCreateRecord:
 		if processor.AllFollowing.UserDids[event.Author] {
-			processor.AllFollowing.RecordFollow(event.Uri, event.Author, event.Record["subject"].(string))
+			return processor.AllFollowing.RecordFollow(event.Uri, event.Author, event.Record["subject"].(string))
 		}
 	case repomgr.EvtKindDeleteRecord:
 		if processor.AllFollowing.UserDids[event.Author] {
-			processor.AllFollowing.RemoveFollow(event.Uri)
+			return processor.AllFollowing.RemoveFollow(event.Uri)
 		}
 	}
+	return nil
 }
