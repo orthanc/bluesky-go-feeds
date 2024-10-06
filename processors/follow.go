@@ -17,11 +17,11 @@ type FollowProcessor struct {
 func (processor *FollowProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
 	switch event.EventKind {
 	case repomgr.EvtKindCreateRecord:
-		if processor.AllFollowing.UserDids[event.Author] {
+		if processor.AllFollowing.IsUser(event.Author) {
 			return processor.AllFollowing.RecordFollow(ctx, event.Uri, event.Author, event.Record["subject"].(string))
 		}
 	case repomgr.EvtKindDeleteRecord:
-		if processor.AllFollowing.UserDids[event.Author] {
+		if processor.AllFollowing.IsUser(event.Author) {
 			return processor.AllFollowing.RemoveFollow(ctx, event.Uri)
 		}
 	}

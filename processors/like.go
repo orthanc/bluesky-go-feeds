@@ -23,7 +23,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		postAuthor := getAuthorFromPostUri(postUri)
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
-		if !(processor.AllFollowing.UserDids[postAuthor] ||
+		if !(processor.AllFollowing.IsUser(postAuthor) ||
 			processor.AllFollowing.FollowedByCount[postAuthor] > 0) {
 			return nil
 		}
@@ -40,7 +40,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 				return err
 			}
 
-			if processor.AllFollowing.UserDids[event.Author] && event.Author != postAuthor {
+			if processor.AllFollowing.IsUser(event.Author) && event.Author != postAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: event.Uri,
 					AuthorDid:      postAuthor,
@@ -54,7 +54,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 				}
 			}
 		}
-		if processor.AllFollowing.UserDids[postAuthor] {
+		if processor.AllFollowing.IsUser(postAuthor) {
 			// Someone liking a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       event.Uri,

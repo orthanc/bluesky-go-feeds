@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -20,7 +21,7 @@ type AllFollowing struct {
 	database *database.Database
 	client   *xrpc.Client
 
-	UserDids         map[string]bool
+	userDids         sync.Map
 	FollowingRecords map[string]schema.Following
 	FollowedByCount  map[string]int
 }
@@ -34,10 +35,17 @@ func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollo
 	return &AllFollowing{
 		database:         database,
 		client:           client,
-		UserDids:         make(map[string]bool),
 		FollowingRecords: make(map[string]schema.Following),
 		FollowedByCount:  make(map[string]int),
 	}
+}
+
+func (allFollowing *AllFollowing) IsUser(userDid string) bool {
+	value, present := allFollowing.userDids.Load(userDid)
+	if present {
+		return value.(bool)
+	}
+	return false
 }
 
 func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
@@ -66,7 +74,7 @@ func (allFollowing *AllFollowing) Hydrate(ctx context.Context) {
 		panic(err)
 	}
 	for _, userDid := range userDids {
-		allFollowing.UserDids[userDid] = true
+		allFollowing.userDids.Store(userDid, true)
 	}
 
 	followingRecords, err := allFollowing.database.Queries.ListAllFollowing(ctx)
@@ -119,7 +127,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, params Sync
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
 		return err
 	}
-	allFollowing.UserDids[user.UserDid] = true
+	allFollowing.userDids.Store(user.UserDid, true)
 
 	follows := make([]schema.Following, 0, 100)
 	for cursor := ""; ; {

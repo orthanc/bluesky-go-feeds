@@ -37,9 +37,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
 		if !(processor.AllFollowing.FollowedByCount[event.Author] > 0 ||
 			processor.AllFollowing.FollowedByCount[replyParentAuthor] > 0 ||
-			processor.AllFollowing.UserDids[replyParentAuthor] ||
+			processor.AllFollowing.IsUser(replyParentAuthor) ||
 			processor.AllFollowing.FollowedByCount[replyRootAuthor] > 0 ||
-			processor.AllFollowing.UserDids[replyRootAuthor]) {
+			processor.AllFollowing.IsUser(replyRootAuthor)) {
 			return nil
 		}
 
@@ -73,7 +73,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				return err
 			}
 
-			if processor.AllFollowing.UserDids[event.Author] && event.Author != replyParentAuthor {
+			if processor.AllFollowing.IsUser(event.Author) && event.Author != replyParentAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: event.Uri,
 					AuthorDid:      replyParentAuthor,
@@ -87,7 +87,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				}
 			}
 		}
-		if processor.AllFollowing.UserDids[replyParentAuthor] && event.Author != replyParentAuthor {
+		if processor.AllFollowing.IsUser(replyParentAuthor) && event.Author != replyParentAuthor {
 			// Someone replying a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       event.Uri,
@@ -114,7 +114,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				return err
 			}
 
-			if processor.AllFollowing.UserDids[event.Author] && event.Author != replyRootAuthor {
+			if processor.AllFollowing.IsUser(event.Author) && event.Author != replyRootAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: event.Uri,
 					AuthorDid:      replyRootAuthor,
@@ -128,7 +128,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				}
 			}
 		}
-		if processor.AllFollowing.UserDids[replyRootAuthor] && event.Author != replyRootAuthor {
+		if processor.AllFollowing.IsUser(replyRootAuthor) && event.Author != replyRootAuthor {
 			// Someone replying a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       event.Uri,
