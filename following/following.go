@@ -22,7 +22,7 @@ type AllFollowing struct {
 	client   *xrpc.Client
 
 	userDids         sync.Map
-	FollowingRecords map[string]schema.Following
+	followingRecords sync.Map
 	followedByCount  sync.Map
 }
 
@@ -33,9 +33,8 @@ type SyncFollowingParams struct {
 
 func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
 	return &AllFollowing{
-		database:         database,
-		client:           client,
-		FollowingRecords: make(map[string]schema.Following),
+		database: database,
+		client:   client,
 	}
 }
 
@@ -44,20 +43,19 @@ func (allFollowing *AllFollowing) IsUser(userDid string) bool {
 	return present && value.(bool)
 }
 
-
 func (allFollowing *AllFollowing) IsFollowed(authorDid string) bool {
 	value, present := allFollowing.followedByCount.Load(authorDid)
 	return present && value.(int) > 0
 }
 
 func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
-	if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
+	_, loaded := allFollowing.followingRecords.Swap(record.Uri, record)
+	if loaded {
 		return
 	}
-	allFollowing.FollowingRecords[record.Uri] = record
 	for {
 		current, _ := allFollowing.followedByCount.LoadOrStore(record.Following, 0)
-		swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int) + 1)
+		swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int)+1)
 		if swapped {
 			break
 		}
@@ -65,29 +63,30 @@ func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 }
 
 func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
-	record, ok := allFollowing.FollowingRecords[uri]
-	if ok {
-		for {
-			current, present := allFollowing.followedByCount.Load(record.Following)
-			if !present {
+	value, loaded := allFollowing.followingRecords.LoadAndDelete(uri)
+	if !loaded {
+		return schema.Following{}, false
+	}
+	record := value.(schema.Following)
+	for {
+		current, present := allFollowing.followedByCount.Load(record.Following)
+		if !present {
+			break
+		}
+		newVal := current.(int) - 1
+		if newVal > 0 {
+			swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int)-1)
+			if swapped {
 				break
 			}
-			newVal := current.(int) - 1
-			if newVal > 0 {
-				swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int) - 1)
-				if swapped {
-					break
-				}
-			} else  {
-				deleted := allFollowing.followedByCount.CompareAndDelete(record.Following, current)
-				if deleted {
-					break
-				}
+		} else {
+			deleted := allFollowing.followedByCount.CompareAndDelete(record.Following, current)
+			if deleted {
+				break
 			}
 		}
-		delete(allFollowing.FollowingRecords, uri)
 	}
-	return record, ok
+	return record, loaded
 }
 
 func (allFollowing *AllFollowing) Hydrate(ctx context.Context) {
@@ -116,9 +115,6 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 	defer tx.Rollback()
 
 	for _, record := range records {
-		if _, ok := allFollowing.FollowingRecords[record.Uri]; ok {
-			continue
-		}
 		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams(record)); err != nil {
 			return err
 		}
