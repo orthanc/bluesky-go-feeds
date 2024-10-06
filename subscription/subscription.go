@@ -69,6 +69,7 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
 	eventCountSinceSync := 0
 	windowStart := time.Now().UnixMilli()
+	var lastEvtTime int64 = 0
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
 			for _, op := range evt.Ops {
@@ -95,9 +96,24 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 					Cursor:  evt.Seq,
 				})
 				windowEnd := time.Now().UnixMilli()
-				timeSpent := float64(windowEnd - windowStart) / 1000.0
-				fmt.Printf("Processed %d events in %f seconds %f evts/s\n", eventCountSinceSync, timeSpent, float64(eventCountSinceSync) / timeSpent)
+				timeSpent := windowEnd - windowStart
+				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
+				evtTime := parsedTime.UnixMilli()
+				caughtUp := evtTime - lastEvtTime
+				lagTime := windowEnd - evtTime
+				fmt.Println(evt.Time)
+				fmt.Printf(
+					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up)\n",
+					eventCountSinceSync,
+					time.Duration(timeSpent) * time.Millisecond,
+					1000.0 * float64(eventCountSinceSync) / float64(timeSpent),
+					evt.Time,
+					time.Duration(caughtUp) * time.Millisecond,
+					time.Duration(lagTime) * time.Millisecond,
+					time.Duration(timeSpent * lagTime / caughtUp) * time.Millisecond,
+				)
 				windowStart = windowEnd
+				lastEvtTime = evtTime
 				eventCountSinceSync = 0
 			}
 			return nil
@@ -124,6 +140,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 
 		eventCountSinceSync = 0
 		windowStart = time.Now().UnixMilli()
+		lastEvtTime = 0
 		err = events.HandleRepoStream(ctx, con, scheduler)
 		if err != nil {
 			fmt.Printf("Error from repo stream: %s\n", err)
