@@ -42,6 +42,14 @@ set
 where
   "uri" = ?;
 
+-- name: IncrementPostLike :exec
+update post
+set
+  "likeCount" = "likeCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?;
+
 -- name: SaveUserInteraction :exec
 insert into
   userInteraction (

@@ -50,6 +50,20 @@ func (q *Queries) IncrementPostIndirectReply(ctx context.Context, uri string) er
 	return err
 }
 
+const incrementPostLike = `-- name: IncrementPostLike :exec
+update post
+set
+  "likeCount" = "likeCount" + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?
+`
+
+func (q *Queries) IncrementPostLike(ctx context.Context, uri string) error {
+	_, err := q.db.ExecContext(ctx, incrementPostLike, uri)
+	return err
+}
+
 const saveAuthor = `-- name: SaveAuthor :exec
 insert into
   author (

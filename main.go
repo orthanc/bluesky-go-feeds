@@ -65,12 +65,13 @@ func main() {
 		AllFollowing: allFollowing,
 	}).Process
 	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
-		Database: database,
+		Database:     database,
 		AllFollowing: allFollowing,
 	}).Process
-	// firehoseListeners["app.bsky.feed.like"] = func(event firehoseEvent) {
-	// 	// fmt.Println(event)
-	// }
+	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
+		Database:     database,
+		AllFollowing: allFollowing,
+	}).Process
 	fmt.Println("Starting")
 	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
 	if err != nil {
