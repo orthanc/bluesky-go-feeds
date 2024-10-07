@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/bluesky-social/indigo/atproto/syntax"
@@ -111,7 +112,18 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	result, err := alg(lastSession)
+	cursor := r.URL.Query().Get("cursor")
+	limit := 30
+	limitParam := r.URL.Query().Get("limit")
+	if limitParam != "" {
+		parsedLimit, err := strconv.Atoi(limitParam)
+		if err != nil {
+			fmt.Printf("invalid limit %s: %s", limitParam, err)
+			w.WriteHeader(400)
+		}
+		limit = parsedLimit
+	}
+	result, err := alg(ctx, *handler.database, lastSession, cursor, limit)
 	if err != nil {
 		fmt.Printf("Error calling %s for %s: %s", feedUri, userDid, err)
 		w.WriteHeader(500)

@@ -75,3 +75,7 @@ func (database *Database) BeginTx(ctx context.Context) (*write.Queries, *sql.Tx,
 	qtx := database.Updates.WithTx(tx)
 	return qtx, tx, nil
 }
+
+func (database *Database) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return database.readDB.QueryContext(ctx, query, args...)
+}
