@@ -13,6 +13,7 @@ type algorithm = func(ctx context.Context, database database.Database, session s
 var algorithms = map[string]algorithm{
 	"catchup": catchup,
 	"oi8ydnb44i8y": goodStuff,
+	"o1s6niihick9": lovelies,
 	// Test feed
-	"replies-foll": catchup,
+	"replies-foll": lovelies,
 }
