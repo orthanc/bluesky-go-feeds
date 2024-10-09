@@ -8,27 +8,28 @@ where
 limit
   1;
 
--- name: ListPosts :many
-SELECT
-  "author",
+-- name: ListPostInteractionsForAuthor :many
+select
   "directReplyCount",
-  "indexedAt",
   "interactionCount",
   "likeCount",
-  "replyCount",
-  "uri",
-  "replyParent",
-  "replyParentAuthor",
-  "replyRoot",
-  "replyRootAuthor"
-FROM
-  post;
+  "replyCount"
+from
+  post
+where
+  "author" = ?;
 
 -- name: ListAllUsers :many
 select
   "userDid"
-FROM
+from
   user;
+
+-- name: ListAllAuthors :many
+select
+  "did"
+from
+  author;
 
 -- name: ListAllFollowing :many
 select

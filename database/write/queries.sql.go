@@ -97,6 +97,36 @@ func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) 
 	return items, nil
 }
 
+const listAllAuthors = `-- name: ListAllAuthors :many
+select
+  "did"
+from
+  author
+`
+
+func (q *Queries) ListAllAuthors(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listAllAuthors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var did string
+		if err := rows.Scan(&did); err != nil {
+			return nil, err
+		}
+		items = append(items, did)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllFollowing = `-- name: ListAllFollowing :many
 select
   uri, followedBy, "following", userInteractionRatio
@@ -135,7 +165,7 @@ func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
 const listAllUsers = `-- name: ListAllUsers :many
 select
   "userDid"
-FROM
+from
   user
 `
 
@@ -162,58 +192,39 @@ func (q *Queries) ListAllUsers(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-const listPosts = `-- name: ListPosts :many
-SELECT
-  "author",
+const listPostInteractionsForAuthor = `-- name: ListPostInteractionsForAuthor :many
+select
   "directReplyCount",
-  "indexedAt",
   "interactionCount",
   "likeCount",
-  "replyCount",
-  "uri",
-  "replyParent",
-  "replyParentAuthor",
-  "replyRoot",
-  "replyRootAuthor"
-FROM
+  "replyCount"
+from
   post
+where
+  "author" = ?
 `
 
-type ListPostsRow struct {
-	Author            string
-	DirectReplyCount  float64
-	IndexedAt         string
-	InteractionCount  float64
-	LikeCount         float64
-	ReplyCount        float64
-	Uri               string
-	ReplyParent       sql.NullString
-	ReplyParentAuthor sql.NullString
-	ReplyRoot         sql.NullString
-	ReplyRootAuthor   sql.NullString
+type ListPostInteractionsForAuthorRow struct {
+	DirectReplyCount float64
+	InteractionCount float64
+	LikeCount        float64
+	ReplyCount       float64
 }
 
-func (q *Queries) ListPosts(ctx context.Context) ([]ListPostsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPosts)
+func (q *Queries) ListPostInteractionsForAuthor(ctx context.Context, author string) ([]ListPostInteractionsForAuthorRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPostInteractionsForAuthor, author)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListPostsRow{}
+	items := []ListPostInteractionsForAuthorRow{}
 	for rows.Next() {
-		var i ListPostsRow
+		var i ListPostInteractionsForAuthorRow
 		if err := rows.Scan(
-			&i.Author,
 			&i.DirectReplyCount,
-			&i.IndexedAt,
 			&i.InteractionCount,
 			&i.LikeCount,
 			&i.ReplyCount,
-			&i.Uri,
-			&i.ReplyParent,
-			&i.ReplyParentAuthor,
-			&i.ReplyRoot,
-			&i.ReplyRootAuthor,
 		); err != nil {
 			return nil, err
 		}

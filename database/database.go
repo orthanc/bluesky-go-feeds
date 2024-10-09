@@ -79,3 +79,7 @@ func (database *Database) BeginTx(ctx context.Context) (*write.Queries, *sql.Tx,
 func (database *Database) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	return database.readDB.QueryContext(ctx, query, args...)
 }
+
+func (database *Database) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return database.writeDB.ExecContext(ctx, query, args...)
+}
