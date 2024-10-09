@@ -50,6 +50,14 @@ set
 where
   "uri" = ?;
 
+-- name: DeletePostsBefore :execrows
+delete from post
+where "indexedAt" < ?;
+
+-- name: DeleteRepostsBefore :execrows
+delete from repost
+where "indexedAt" < ?;
+
 -- name: SaveUserInteraction :exec
 insert into
   userInteraction (
@@ -63,6 +71,10 @@ insert into
 values
   (?, ?, ?, ?, ?, ?) on conflict do nothing;
 
+-- name: DeleteUserInteractionsBefore :execrows
+delete from userInteraction
+where "indexedAt" < ?;
+
 -- name: SaveInteractionWithUser :exec
 insert into
   interactionWithUser (
@@ -75,6 +87,10 @@ insert into
   )
 values
   (?, ?, ?, ?, ?, ?) on conflict do nothing;
+
+-- name: DeleteInteractionWithUsersBefore :execrows
+delete from interactionWithUser
+where "indexedAt" < ?;
 
 -- name: SaveUser :exec
 insert into
@@ -112,6 +128,10 @@ set
   "accessCount" = "accessCount" + 1
 where
   "sessionId" = ?;
+
+-- name: DeleteSessionsBefore :execrows
+delete from session
+where "lastSeen" < ?;
 
 -- name: SaveFollowing :exec
 insert into

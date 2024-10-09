@@ -21,6 +21,71 @@ func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
 	return err
 }
 
+const deleteInteractionWithUsersBefore = `-- name: DeleteInteractionWithUsersBefore :execrows
+delete from interactionWithUser
+where "indexedAt" < ?
+`
+
+func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexedat string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteInteractionWithUsersBefore, indexedat)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deletePostsBefore = `-- name: DeletePostsBefore :execrows
+delete from post
+where "indexedAt" < ?
+`
+
+func (q *Queries) DeletePostsBefore(ctx context.Context, indexedat string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deletePostsBefore, indexedat)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteRepostsBefore = `-- name: DeleteRepostsBefore :execrows
+delete from repost
+where "indexedAt" < ?
+`
+
+func (q *Queries) DeleteRepostsBefore(ctx context.Context, indexedat string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteRepostsBefore, indexedat)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteSessionsBefore = `-- name: DeleteSessionsBefore :execrows
+delete from session
+where "lastSeen" < ?
+`
+
+func (q *Queries) DeleteSessionsBefore(ctx context.Context, lastseen string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteSessionsBefore, lastseen)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteUserInteractionsBefore = `-- name: DeleteUserInteractionsBefore :execrows
+delete from userInteraction
+where "indexedAt" < ?
+`
+
+func (q *Queries) DeleteUserInteractionsBefore(ctx context.Context, indexedat string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserInteractionsBefore, indexedat)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const incrementPostDirectReply = `-- name: IncrementPostDirectReply :exec
 update post
 set

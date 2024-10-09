@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -27,10 +28,26 @@ type AllFollowing struct {
 }
 
 func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
-	return &AllFollowing{
+	allFollowing := &AllFollowing{
 		database: database,
 		client:   client,
 	}
+
+	ctx := context.Background()
+	ticker := time.NewTicker(time.Hour)
+	go func () {
+		err := allFollowing.Purge(ctx)
+		if err != nil {
+			fmt.Printf("Error purging data: %s\n",  err)
+		}
+		for range ticker.C {
+			err := allFollowing.Purge(ctx)
+			if err != nil {
+				fmt.Printf("Error purging data: %s\n",  err)
+			}}
+	}()
+
+	return allFollowing;
 }
 
 func (allFollowing *AllFollowing) IsUser(userDid string) bool {
@@ -193,5 +210,44 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 			return err
 		}
 	}
+	return nil
+}
+
+func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
+	purgeBefore := time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	fmt.Printf("Purging data before %s\n", purgeBefore)
+	if rows, err := updates.DeletePostsBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d posts\n", rows)
+	} else {
+		return fmt.Errorf("error purging posts: %w", err)
+	}
+	if rows, err := updates.DeleteRepostsBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d reposts\n", rows)
+	} else {
+		return fmt.Errorf("error purging reposts: %w", err)
+	}
+	if rows, err := updates.DeleteSessionsBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d sessions\n", rows)
+	} else {
+		return fmt.Errorf("error purging sessions: %w", err)
+	}
+	if rows, err := updates.DeleteUserInteractionsBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d user interactions\n", rows)
+	} else {
+		return fmt.Errorf("error purging user interactions: %w", err)
+	}
+	if rows, err := updates.DeleteInteractionWithUsersBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d interactions with user\n", rows)
+	} else {
+		return fmt.Errorf("error purging interactions with user: %w", err)
+	}
+	tx.Commit()
+
+	fmt.Println("Purge complete")
 	return nil
 }
