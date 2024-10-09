@@ -17,14 +17,14 @@ import (
 )
 
 type GetFeedSkeletonHandler struct {
-	syncFollowingChan chan following.SyncFollowingParams
+	following *following.AllFollowing
 	database *database.Database
 }
 
-func NewGetFeedSkeleton(database *database.Database, syncFollowingChan chan following.SyncFollowingParams) http.Handler {
+func NewGetFeedSkeleton(database *database.Database, following *following.AllFollowing) http.Handler {
 	return GetFeedSkeletonHandler{
 		database: database,
-		syncFollowingChan: syncFollowingChan,
+		following: following,
 	}
 }
 
@@ -69,10 +69,12 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			return
 		}
 		if updated == 0 {
-			handler.syncFollowingChan <- following.SyncFollowingParams{
-				UserDid:  userDid,
-				LastSeen: lastSeen,
-			}
+			go func() {
+				err := handler.following.SyncFollowing(context.Background(), userDid, lastSeen)
+				if err != nil {
+					fmt.Printf("Error syncing follow for %s: %s\n", userDid, err)
+				}
+			}()
 		}
 		postsSince := time.Now().Add(time.Duration(-24) * time.Hour).Format(time.RFC3339)
 		if len(lastSessionResult) > 0 {

@@ -17,15 +17,6 @@ import (
 	"github.com/orthanc/feedgenerator/web"
 )
 
-func backgroundJobs(following *following.AllFollowing, syncFollowingChan chan following.SyncFollowingParams) {
-	for syncFollowingParams := range syncFollowingChan {
-		err := following.SyncFollowing(context.Background(), syncFollowingParams)
-		if err != nil {
-			fmt.Printf("Error syncing follow for %s: %s\n", syncFollowingParams.UserDid, err)
-		}
-	}
-}
-
 func main() {
 	ctx := context.Background()
 
@@ -44,10 +35,7 @@ func main() {
 	allFollowing.Hydrate(ctx)
 	ratios.NewRatios(database)
 
-	syncFollowingChan := make(chan following.SyncFollowingParams)
-	go backgroundJobs(allFollowing, syncFollowingChan)
-
-	go web.StartServer(database, syncFollowingChan)
+	go web.StartServer(database, allFollowing)
 
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{

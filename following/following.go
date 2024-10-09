@@ -26,11 +26,6 @@ type AllFollowing struct {
 	followedByCount  sync.Map
 }
 
-type SyncFollowingParams struct {
-	UserDid  string
-	LastSeen string
-}
-
 func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
 	return &AllFollowing{
 		database: database,
@@ -140,8 +135,11 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 	return nil
 }
 
-func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, params SyncFollowingParams) error {
-	user := writeSchema.SaveUserParams(params)
+func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid string, lastSeen string) error {
+	user := writeSchema.SaveUserParams{
+		UserDid: userDid,
+		LastSeen: lastSeen,
+	}
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
 		return err
 	}

@@ -46,10 +46,10 @@ func describeFeedGenerator(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func StartServer(database *database.Database, syncFollowingChan chan following.SyncFollowingParams) {
+func StartServer(database *database.Database, following *following.AllFollowing) {
 	http.HandleFunc("GET /.well-known/did.json", wellKnownDidHandler)
 	http.HandleFunc("GET /xrpc/app.bsky.feed.describeFeedGenerator", describeFeedGenerator)
-	http.Handle("GET /xrpc/app.bsky.feed.getFeedSkeleton", NewGetFeedSkeleton(database, syncFollowingChan))
+	http.Handle("GET /xrpc/app.bsky.feed.getFeedSkeleton", NewGetFeedSkeleton(database, following))
 
 	fmt.Printf("Starting server on %s:%s\n", os.Getenv("FEEDGEN_LISTENHOST"), os.Getenv("FEEDGEN_PORT"))
 	err := http.ListenAndServe(fmt.Sprintf("%s:%s", os.Getenv("FEEDGEN_LISTENHOST"), os.Getenv("FEEDGEN_PORT")), nil)
