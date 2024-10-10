@@ -236,9 +236,11 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 	var authorsToDelete []string
 	allFollowing.followingRecords.Range(func (key any, value any) bool {
 		following := value.(schema.Following)
-		allFollowing.removeFollowData(following.Uri)
-		if !allFollowing.IsFollowed(following.Following) {
-			authorsToDelete = append(authorsToDelete, following.Following)
+		if following.FollowedBy == userDid {
+			allFollowing.removeFollowData(following.Uri)
+			if !allFollowing.IsFollowed(following.Following) {
+				authorsToDelete = append(authorsToDelete, following.Following)
+			}
 		}
 		return true
 	})
