@@ -104,42 +104,40 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 
 		// We don't want to double process direct replies so everything after this only applies if
 		// the reply parent and reply root are different
-		if replyParent == replyRoot {
-			return nil
-		}
+		if replyParent != replyRoot {
+			if processor.AllFollowing.IsFollowed(replyRootAuthor) {
+				err := updates.IncrementPostIndirectReply(ctx, event.Uri)
+				if err != nil {
+					return err
+				}
 
-		if processor.AllFollowing.IsFollowed(replyRootAuthor) {
-			err := updates.IncrementPostIndirectReply(ctx, event.Uri)
-			if err != nil {
-				return err
+				if processor.AllFollowing.IsUser(event.Author) && event.Author != replyRootAuthor {
+					err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
+						InteractionUri: event.Uri,
+						AuthorDid:      replyRootAuthor,
+						UserDid:        event.Author,
+						PostUri:        replyRoot,
+						Type:           "threadReply",
+						IndexedAt:      indexedAt,
+					})
+					if err != nil {
+						return err
+					}
+				}
 			}
-
-			if processor.AllFollowing.IsUser(event.Author) && event.Author != replyRootAuthor {
-				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
-					InteractionUri: event.Uri,
-					AuthorDid:      replyRootAuthor,
-					UserDid:        event.Author,
-					PostUri:        replyRoot,
-					Type:           "threadReply",
-					IndexedAt:      indexedAt,
+			if processor.AllFollowing.IsUser(replyRootAuthor) && event.Author != replyRootAuthor {
+				// Someone replying a post by one of the users
+				err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
+					InteractionUri:       event.Uri,
+					InteractionAuthorDid: event.Author,
+					UserDid:              replyRootAuthor,
+					PostUri:              replyRoot,
+					Type:                 "threadReply",
+					IndexedAt:            indexedAt,
 				})
 				if err != nil {
 					return err
 				}
-			}
-		}
-		if processor.AllFollowing.IsUser(replyRootAuthor) && event.Author != replyRootAuthor {
-			// Someone replying a post by one of the users
-			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
-				InteractionUri:       event.Uri,
-				InteractionAuthorDid: event.Author,
-				UserDid:              replyRootAuthor,
-				PostUri:              replyRoot,
-				Type:                 "threadReply",
-				IndexedAt:            indexedAt,
-			})
-			if err != nil {
-				return err
 			}
 		}
 
