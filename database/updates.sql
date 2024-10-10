@@ -52,11 +52,13 @@ where
 
 -- name: DeletePostsBefore :execrows
 delete from post
-where "indexedAt" < ?;
+where
+  "indexedAt" < ?;
 
 -- name: DeleteRepostsBefore :execrows
 delete from repost
-where "indexedAt" < ?;
+where
+  "indexedAt" < ?;
 
 -- name: SaveUserInteraction :exec
 insert into
@@ -73,7 +75,8 @@ values
 
 -- name: DeleteUserInteractionsBefore :execrows
 delete from userInteraction
-where "indexedAt" < ?;
+where
+  "indexedAt" < ?;
 
 -- name: SaveInteractionWithUser :exec
 insert into
@@ -90,7 +93,8 @@ values
 
 -- name: DeleteInteractionWithUsersBefore :execrows
 delete from interactionWithUser
-where "indexedAt" < ?;
+where
+  "indexedAt" < ?;
 
 -- name: SaveUser :exec
 insert into
@@ -107,6 +111,12 @@ set
   "lastSeen" = ?
 where
   "userDid" = ?;
+
+-- name: DeleteUserWhenNotSeen :execrows
+delete from user
+where
+  "userDid" = ?
+  and "lastSeen" < sqlc.arg ('purgeBefore');
 
 -- name: SaveSession :exec
 insert into
@@ -131,7 +141,8 @@ where
 
 -- name: DeleteSessionsBefore :execrows
 delete from session
-where "lastSeen" < ?;
+where
+  "lastSeen" < ?;
 
 -- name: SaveFollowing :exec
 insert into
@@ -170,3 +181,8 @@ set
   "medianInteractionCount" = ?
 where
   "did" = ?;
+
+-- name: DeleteAuthorsByDid :execrows
+delete from author
+where
+  "did" in (sqlc.slice ('dids'));

@@ -35,19 +35,20 @@ func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollo
 
 	ctx := context.Background()
 	ticker := time.NewTicker(time.Hour)
-	go func () {
+	go func() {
 		err := allFollowing.Purge(ctx)
 		if err != nil {
-			fmt.Printf("Error purging data: %s\n",  err)
+			fmt.Printf("Error purging data: %s\n", err)
 		}
 		for range ticker.C {
 			err := allFollowing.Purge(ctx)
 			if err != nil {
-				fmt.Printf("Error purging data: %s\n",  err)
-			}}
+				fmt.Printf("Error purging data: %s\n", err)
+			}
+		}
 	}()
 
-	return allFollowing;
+	return allFollowing
 }
 
 func (allFollowing *AllFollowing) IsUser(userDid string) bool {
@@ -154,7 +155,7 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 
 func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid string, lastSeen string) error {
 	user := writeSchema.SaveUserParams{
-		UserDid: userDid,
+		UserDid:  userDid,
 		LastSeen: lastSeen,
 	}
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
@@ -213,6 +214,48 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 	return nil
 }
 
+func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string, purgeBefore string) error {
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if rows, err := updates.DeleteUserWhenNotSeen(ctx, writeSchema.DeleteUserWhenNotSeenParams{
+		UserDid:     userDid,
+		PurgeBefore: purgeBefore,
+	}); err != nil {
+		return fmt.Errorf("error deleting user %s: %w", userDid, err)
+	} else if rows == 0 {
+		// If user wasn't deleted they were seen since we listed them
+		// so just return with no action
+		return nil
+	}
+
+	allFollowing.userDids.Delete(userDid)
+	var authorsToDelete []string
+	allFollowing.followingRecords.Range(func (key any, value any) bool {
+		following := value.(schema.Following)
+		allFollowing.removeFollowData(following.Uri)
+		if !allFollowing.IsFollowed(following.Following) {
+			authorsToDelete = append(authorsToDelete, following.Following)
+		}
+		return true
+	})
+	for start := 0; start < len(authorsToDelete); {
+		end := min(start + 1000, len(authorsToDelete))
+		batch := authorsToDelete[start:end]
+		if _, err := updates.DeleteAuthorsByDid(ctx, batch); err != nil {
+			return fmt.Errorf("error deleting authors now unused by user %s: %w", userDid, err)
+		}
+		start = end
+	}
+
+	tx.Commit()
+	fmt.Printf("Deleted user %s\n", userDid)
+	return nil
+}
+
 func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	purgeBefore := time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
@@ -247,6 +290,17 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 		return fmt.Errorf("error purging interactions with user: %w", err)
 	}
 	tx.Commit()
+
+	usersToDelete, err := allFollowing.database.Queries.ListUsersNotSeenSince(ctx, purgeBefore)
+	if err != nil {
+		return fmt.Errorf("error listing users to purge: %w", err)
+	}
+	for _, userDid := range usersToDelete {
+		err := allFollowing.purgeUser(ctx, userDid, purgeBefore)
+		if err != nil {
+			return fmt.Errorf("error deleting user %s: %w", userDid, err)
+		}
+	}
 
 	fmt.Println("Purge complete")
 	return nil

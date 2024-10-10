@@ -25,6 +25,14 @@ select
 from
   user;
 
+-- name: ListUsersNotSeenSince :many
+select
+  "userDid"
+from
+  user
+where
+  "lastSeen" < sqlc.arg ('purgeBefore');
+
 -- name: ListAllAuthors :many
 select
   "did"

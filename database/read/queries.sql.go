@@ -238,3 +238,35 @@ func (q *Queries) ListPostInteractionsForAuthor(ctx context.Context, author stri
 	}
 	return items, nil
 }
+
+const listUsersNotSeenSince = `-- name: ListUsersNotSeenSince :many
+select
+  "userDid"
+from
+  user
+where
+  "lastSeen" < ?1
+`
+
+func (q *Queries) ListUsersNotSeenSince(ctx context.Context, purgebefore string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listUsersNotSeenSince, purgebefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var userDid string
+		if err := rows.Scan(&userDid); err != nil {
+			return nil, err
+		}
+		items = append(items, userDid)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

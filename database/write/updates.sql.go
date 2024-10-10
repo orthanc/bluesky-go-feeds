@@ -8,7 +8,32 @@ package write
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
+
+const deleteAuthorsByDid = `-- name: DeleteAuthorsByDid :execrows
+delete from author
+where
+  "did" in (/*SLICE:dids*/?)
+`
+
+func (q *Queries) DeleteAuthorsByDid(ctx context.Context, dids []string) (int64, error) {
+	query := deleteAuthorsByDid
+	var queryParams []interface{}
+	if len(dids) > 0 {
+		for _, v := range dids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:dids*/?", strings.Repeat(",?", len(dids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:dids*/?", "NULL", 1)
+	}
+	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
 
 const deleteFollowing = `-- name: DeleteFollowing :exec
 delete from following
@@ -23,7 +48,8 @@ func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
 
 const deleteInteractionWithUsersBefore = `-- name: DeleteInteractionWithUsersBefore :execrows
 delete from interactionWithUser
-where "indexedAt" < ?
+where
+  "indexedAt" < ?
 `
 
 func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexedat string) (int64, error) {
@@ -36,7 +62,8 @@ func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexeda
 
 const deletePostsBefore = `-- name: DeletePostsBefore :execrows
 delete from post
-where "indexedAt" < ?
+where
+  "indexedAt" < ?
 `
 
 func (q *Queries) DeletePostsBefore(ctx context.Context, indexedat string) (int64, error) {
@@ -49,7 +76,8 @@ func (q *Queries) DeletePostsBefore(ctx context.Context, indexedat string) (int6
 
 const deleteRepostsBefore = `-- name: DeleteRepostsBefore :execrows
 delete from repost
-where "indexedAt" < ?
+where
+  "indexedAt" < ?
 `
 
 func (q *Queries) DeleteRepostsBefore(ctx context.Context, indexedat string) (int64, error) {
@@ -62,7 +90,8 @@ func (q *Queries) DeleteRepostsBefore(ctx context.Context, indexedat string) (in
 
 const deleteSessionsBefore = `-- name: DeleteSessionsBefore :execrows
 delete from session
-where "lastSeen" < ?
+where
+  "lastSeen" < ?
 `
 
 func (q *Queries) DeleteSessionsBefore(ctx context.Context, lastseen string) (int64, error) {
@@ -75,11 +104,32 @@ func (q *Queries) DeleteSessionsBefore(ctx context.Context, lastseen string) (in
 
 const deleteUserInteractionsBefore = `-- name: DeleteUserInteractionsBefore :execrows
 delete from userInteraction
-where "indexedAt" < ?
+where
+  "indexedAt" < ?
 `
 
 func (q *Queries) DeleteUserInteractionsBefore(ctx context.Context, indexedat string) (int64, error) {
 	result, err := q.db.ExecContext(ctx, deleteUserInteractionsBefore, indexedat)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteUserWhenNotSeen = `-- name: DeleteUserWhenNotSeen :execrows
+delete from user
+where
+  "userDid" = ?
+  and "lastSeen" < ?2
+`
+
+type DeleteUserWhenNotSeenParams struct {
+	UserDid     string
+	PurgeBefore string
+}
+
+func (q *Queries) DeleteUserWhenNotSeen(ctx context.Context, arg DeleteUserWhenNotSeenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserWhenNotSeen, arg.UserDid, arg.PurgeBefore)
 	if err != nil {
 		return 0, err
 	}
