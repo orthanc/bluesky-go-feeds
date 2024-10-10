@@ -33,7 +33,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 			return err
 		}
 		defer tx.Rollback()
-		indexedAt := time.Now().Format(time.RFC3339)
+		indexedAt := time.Now().UTC().Format(time.RFC3339)
 		if processor.AllFollowing.IsFollowed(postAuthor) {
 			err := updates.IncrementPostLike(ctx, postUri)
 			if err != nil {

@@ -68,7 +68,7 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 
 func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
 	eventCountSinceSync := 0
-	windowStart := time.Now().UnixMilli()
+	windowStart := time.Now().UTC().UnixMilli()
 	var lastEvtTime int64 = 0
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
@@ -95,7 +95,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 					Service: service,
 					Cursor:  evt.Seq,
 				})
-				windowEnd := time.Now().UnixMilli()
+				windowEnd := time.Now().UTC().UnixMilli()
 				timeSpent := windowEnd - windowStart
 				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
 				evtTime := parsedTime.UnixMilli()
@@ -138,7 +138,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 		scheduler := sequential.NewScheduler("test", rsc.EventHandler)
 
 		eventCountSinceSync = 0
-		windowStart = time.Now().UnixMilli()
+		windowStart = time.Now().UTC().UnixMilli()
 		lastEvtTime = 0
 		err = events.HandleRepoStream(ctx, con, scheduler)
 		if err != nil {

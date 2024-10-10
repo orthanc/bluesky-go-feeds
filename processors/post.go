@@ -48,7 +48,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			return err
 		}
 		defer tx.Rollback()
-		indexedAt := time.Now().Format(time.RFC3339)
+		indexedAt := time.Now().UTC().Format(time.RFC3339)
 		if processor.AllFollowing.IsFollowed(event.Author) {
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,

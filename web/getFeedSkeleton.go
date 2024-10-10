@@ -54,10 +54,10 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		w.WriteHeader(500)
 		return
 	}
-	lastSeen := time.Now().Format(time.RFC3339)
+	lastSeen := time.Now().UTC().Format(time.RFC3339)
 
 	var lastSession schema.Session
-	if len(lastSessionResult) == 0 || lastSessionResult[0].LastSeen < time.Now().Add(time.Duration(-1) * time.Hour).Format(time.RFC3339) {
+	if len(lastSessionResult) == 0 || lastSessionResult[0].LastSeen < time.Now().UTC().Add(time.Duration(-1) * time.Hour).Format(time.RFC3339) {
 		updated, err := handler.database.Updates.UpdateUserLastSeen(ctx, writeSchema.UpdateUserLastSeenParams{
 			UserDid: userDid,
 			LastSeen: lastSeen,
@@ -75,7 +75,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 				}
 			}()
 		}
-		postsSince := time.Now().Add(time.Duration(-24) * time.Hour).Format(time.RFC3339)
+		postsSince := time.Now().UTC().Add(time.Duration(-24) * time.Hour).Format(time.RFC3339)
 		if len(lastSessionResult) > 0 {
 			postsSince = lastSessionResult[0].StartedAt
 		}

@@ -257,7 +257,7 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 }
 
 func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
-	purgeBefore := time.Now().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
+	purgeBefore := time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
 	if err != nil {
 		return err
