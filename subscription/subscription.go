@@ -90,7 +90,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 				}
 			}
 			eventCountSinceSync++
-			if eventCountSinceSync >= 100000 {
+			if eventCountSinceSync >= 1000 {
 				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
 					Service: service,
 					Cursor:  evt.Seq,
