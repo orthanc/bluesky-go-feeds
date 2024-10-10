@@ -26,7 +26,7 @@ select
 from
   "post"
   inner join "author" on "post"."author" = "author"."did"
-  inner join "following" on "post.author" = "following"."following"
+  inner join "following" on "post"."author" = "following"."following"
 where
   "following"."followedBy" = ?
   and "post"."indexedAt" >= ?
@@ -51,7 +51,7 @@ func catchup(ctx context.Context, database database.Database, session schema.Ses
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, catchupQuery, session.UserDid, session.LastSeen, limit, offset)
+	rows, err := database.QueryContext(ctx, catchupQuery, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing catchup query: %s", err)
 	}

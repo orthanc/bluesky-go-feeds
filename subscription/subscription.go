@@ -101,7 +101,6 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 				evtTime := parsedTime.UnixMilli()
 				caughtUp := evtTime - lastEvtTime
 				lagTime := windowEnd - evtTime
-				fmt.Println(evt.Time)
 				fmt.Printf(
 					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up)\n",
 					eventCountSinceSync,
