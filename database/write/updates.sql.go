@@ -382,21 +382,23 @@ func (q *Queries) SaveSession(ctx context.Context, arg SaveSessionParams) error 
 
 const saveUser = `-- name: SaveUser :exec
 insert into
-  user ("userDid", "lastSeen")
+  user ("userDid", "lastSeen", "lastSynced")
 values
-  (?, ?) on conflict do
+  (?, ?, ?) on conflict do
 update
 set
-  "lastSeen" = excluded."lastSeen"
+  "lastSeen" = excluded."lastSeen",
+  "lastSynced" = excluded."lastSynced"
 `
 
 type SaveUserParams struct {
-	UserDid  string
-	LastSeen string
+	UserDid    string
+	LastSeen   string
+	LastSynced sql.NullString
 }
 
 func (q *Queries) SaveUser(ctx context.Context, arg SaveUserParams) error {
-	_, err := q.db.ExecContext(ctx, saveUser, arg.UserDid, arg.LastSeen)
+	_, err := q.db.ExecContext(ctx, saveUser, arg.UserDid, arg.LastSeen, arg.LastSynced)
 	return err
 }
 
@@ -484,12 +486,13 @@ func (q *Queries) UpdateSessionLastSeen(ctx context.Context, arg UpdateSessionLa
 	return err
 }
 
-const updateUserLastSeen = `-- name: UpdateUserLastSeen :execrows
+const updateUserLastSeen = `-- name: UpdateUserLastSeen :many
 update user
 set
   "lastSeen" = ?
 where
   "userDid" = ?
+returning userDid, lastSeen, lastSynced
 `
 
 type UpdateUserLastSeenParams struct {
@@ -497,10 +500,25 @@ type UpdateUserLastSeenParams struct {
 	UserDid  string
 }
 
-func (q *Queries) UpdateUserLastSeen(ctx context.Context, arg UpdateUserLastSeenParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserLastSeen, arg.LastSeen, arg.UserDid)
+func (q *Queries) UpdateUserLastSeen(ctx context.Context, arg UpdateUserLastSeenParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, updateUserLastSeen, arg.LastSeen, arg.UserDid)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected()
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(&i.UserDid, &i.LastSeen, &i.LastSynced); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

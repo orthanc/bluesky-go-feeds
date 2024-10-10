@@ -98,19 +98,21 @@ where
 
 -- name: SaveUser :exec
 insert into
-  user ("userDid", "lastSeen")
+  user ("userDid", "lastSeen", "lastSynced")
 values
-  (?, ?) on conflict do
+  (?, ?, ?) on conflict do
 update
 set
-  "lastSeen" = excluded."lastSeen";
+  "lastSeen" = excluded."lastSeen",
+  "lastSynced" = excluded."lastSynced";
 
--- name: UpdateUserLastSeen :execrows
+-- name: UpdateUserLastSeen :many
 update user
 set
   "lastSeen" = ?
 where
-  "userDid" = ?;
+  "userDid" = ?
+returning *;
 
 -- name: DeleteUserWhenNotSeen :execrows
 delete from user

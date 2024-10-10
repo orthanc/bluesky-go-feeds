@@ -157,6 +157,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 	user := writeSchema.SaveUserParams{
 		UserDid:  userDid,
 		LastSeen: lastSeen,
+		LastSynced: database.ToNullString(time.Now().UTC().Format(time.RFC3339)),
 	}
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
 		return err
@@ -164,6 +165,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 	allFollowing.userDids.Store(user.UserDid, true)
 
 	follows := make([]schema.Following, 0, 100)
+	followedFromSync := make(map[string]bool)
 	for cursor := ""; ; {
 		followResult, err := atproto.RepoListRecords(ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, user.UserDid, false, "", "")
 		if err != nil {
@@ -178,6 +180,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 				FollowedBy:           user.UserDid,
 				UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
 			}
+			followedFromSync[follows[i].Following] = true
 		}
 		err = allFollowing.saveFollowingPage(ctx, follows)
 		if err != nil {
@@ -189,6 +192,14 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		}
 		cursor = *followResult.Cursor
 	}
+	allFollowing.followingRecords.Range(func (key any, value any) bool {
+		// following := value.(schema.Following)
+		// allFollowing.removeFollowData(following.Uri)
+		// if !allFollowing.IsFollowed(following.Following) {
+		// 	authorsToDelete = append(authorsToDelete, following.Following)
+		// }
+		return true
+	})
 	return nil
 }
 

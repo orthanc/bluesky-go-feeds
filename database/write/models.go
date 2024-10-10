@@ -70,8 +70,9 @@ type SubState struct {
 }
 
 type User struct {
-	UserDid  string
-	LastSeen string
+	UserDid    string
+	LastSeen   string
+	LastSynced sql.NullString
 }
 
 type UserInteraction struct {

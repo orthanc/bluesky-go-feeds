@@ -67,7 +67,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			w.WriteHeader(500)
 			return
 		}
-		if updated == 0 {
+		if len(updated) == 0 || !updated[0].LastSynced.Valid || updated[0].LastSynced.String < time.Now().UTC().Add(time.Duration(-24) * time.Hour).Format(time.RFC3339) {
 			go func() {
 				err := handler.following.SyncFollowing(context.Background(), userDid, lastSeen)
 				if err != nil {
