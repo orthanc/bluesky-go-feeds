@@ -56,7 +56,6 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	lastSeen := time.Now().Format(time.RFC3339)
 
-	fmt.Println(lastSeen, time.Now().Add(time.Duration(-1) * time.Hour).Format(time.RFC3339))
 	var lastSession schema.Session
 	if len(lastSessionResult) == 0 || lastSessionResult[0].LastSeen < time.Now().Add(time.Duration(-1) * time.Hour).Format(time.RFC3339) {
 		updated, err := handler.database.Updates.UpdateUserLastSeen(ctx, writeSchema.UpdateUserLastSeenParams{
