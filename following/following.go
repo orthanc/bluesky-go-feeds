@@ -193,11 +193,12 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		cursor = *followResult.Cursor
 	}
 	allFollowing.followingRecords.Range(func (key any, value any) bool {
-		// following := value.(schema.Following)
-		// allFollowing.removeFollowData(following.Uri)
-		// if !allFollowing.IsFollowed(following.Following) {
-		// 	authorsToDelete = append(authorsToDelete, following.Following)
-		// }
+		following := value.(schema.Following)
+		if following.FollowedBy == userDid && !followedFromSync[following.Following] {
+			if err := allFollowing.RemoveFollow(ctx, following.Uri); err != nil {
+				fmt.Printf("Error removing orphaned follow %s %s => %s: %s", following.Uri, following.FollowedBy, following.Following, err)
+			}
+		}
 		return true
 	})
 	return nil
