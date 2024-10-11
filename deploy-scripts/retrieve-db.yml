@@ -1,0 +1,19 @@
+- name: Setup Environment
+  hosts: feedgeneratorv2
+  tasks:
+    - name: Stop service
+      ansible.builtin.service:
+        name: feedgenerator
+        state: stopped
+    - name: Retrieve Database
+      ansible.builtin.fetch:
+        src: /home/feedgenerator/feed-data.db
+        dest: ./feed-data.db
+    - name: Retrieve Database
+      ansible.builtin.fetch:
+        src: /home/feedgenerator/feed-data.db-wal
+        dest: ./feed-data.db
+    - name: Start service
+      ansible.builtin.service:
+        name: feedgenerator
+        state: started

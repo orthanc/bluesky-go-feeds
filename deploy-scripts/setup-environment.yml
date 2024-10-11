@@ -1,0 +1,48 @@
+- name: Setup Environment
+  hosts: feedgeneratorv2
+  tasks:
+    - name: Add feedgenerator user
+      ansible.builtin.user:
+        name: feedgenerator
+    - name: Setup service                                                                                                                           
+      ansible.builtin.template:                                                                                                                     
+        src: ./feedgenerator.service.template
+        dest: /etc/systemd/system/feedgenerator.service
+        mode: '0444'
+    - name: Create Service Directory
+      ansible.builtin.file:
+        path: /opt/feedgenerator
+        state: directory
+        mode: '0755'
+    - name: Copy feedgenerator
+      ansible.builtin.copy:
+        src: ../feedgenerator
+        dest: /opt/feedgenerator/feedgenerator-to-deploy
+        mode: '0555'
+    - name: Stop feedgenerator
+      ansible.builtin.service:
+        name: feedgenerator
+        enabled: yes
+        state: stopped
+    - name: Swap feedgenerator
+      command: mv /opt/feedgenerator/feedgenerator-to-deploy /opt/feedgenerator/feedgenerator
+    - name: Start feedgenerator
+      ansible.builtin.service:
+        name: feedgenerator
+        enabled: yes
+        daemon_reload: true
+        state: restarted
+    - name: Install caddy
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+    - name: Setup Caddy
+      ansible.builtin.template:                                                                                                                     
+        src: ./Caddyfile.template
+        dest: /etc/caddy/Caddyfile
+        mode: '0444'
+    - name: Reload caddy
+      ansible.builtin.service:
+        name: caddy
+        enabled: yes
+        state: reloaded
