@@ -8,6 +8,8 @@ WorkingDirectory=/opt/feedgenerator
 Restart=always
 User=feedgenerator
 Environment=PATH=/usr/bin:/usr/local/bin
+Environment=FEEDGEN_PORT=3000
+Environment=FEEDGEN_LISTENHOST=localhost
 Environment=FEEDGEN_SUBSCRIPTION_ENDPOINT=wss://bsky.network
 Environment=FEEDGEN_SQLITE_LOCATION="/home/feedgenerator/feed-data.db"
 Environment=FEEDGEN_PUBLISHER_DID={{ feed_publisher_did }}
