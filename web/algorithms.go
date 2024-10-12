@@ -14,6 +14,7 @@ var algorithms = map[string]algorithm{
 	"catchup": catchup,
 	"oi8ydnb44i8y": goodStuff,
 	"o1s6niihick9": lovelies,
+	"3l6bvwqxjuvit": quietPosters,
 	// Test feed
-	"replies-foll": lovelies,
+	"replies-foll": 	quietPosters,
 }

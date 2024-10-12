@@ -55,6 +55,10 @@ update "following" set "userInteractionRatio" = (
 )
 `
 
+var updatePostCountsSql string = `
+update "author" set "postCount" = (select count(*) from "post" where "post"."author" = "author"."did")
+`
+
 
 // async updateAllMedians() {
 // 	const authors = await this.db.selectFrom('author').select(['did']).execute();
@@ -84,12 +88,21 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 			return err
 		}
 	}
+	err = ratios.UpdatePostCounts(ctx)
+	if err != nil {
+		return err
+	}
 	err = ratios.RecalculateInteractionScores(ctx)
 	if err != nil {
 		return err
 	}
 	fmt.Println("Done updating all ratios")
 	return nil
+}
+
+func (ratios *Ratios) UpdatePostCounts(ctx context.Context) error {
+	_, err := ratios.database.ExecContext(ctx, updatePostCountsSql)
+	return err
 }
 
 func (ratios *Ratios) RecalculateInteractionScores(ctx context.Context) error {
