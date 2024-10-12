@@ -68,6 +68,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 				return err
 			}
 		}
+		tx.Commit()
 	}
 	return nil
 }
