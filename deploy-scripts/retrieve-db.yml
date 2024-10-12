@@ -1,5 +1,5 @@
 - name: Setup Environment
-  hosts: feedgeneratorv2
+  hosts: feedgenerator
   tasks:
     - name: Stop service
       ansible.builtin.service:
