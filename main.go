@@ -37,6 +37,16 @@ func main() {
 
 	go web.StartServer(database, allFollowing)
 
+	go func () {
+	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
+	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
+			Database:     database,
+			AllFollowing: allFollowing,
+		}).Process
+		fmt.Println("Starting like replay")
+		err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, "like-replay", 2375948440)
+	}()
+
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{
 		Database:     database,
@@ -51,7 +61,7 @@ func main() {
 		AllFollowing: allFollowing,
 	}).Process
 	fmt.Println("Starting")
-	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
+	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, "main", 0)
 	if err != nil {
 		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
 	}

@@ -66,12 +66,22 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	}
 }
 
-func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
+func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener, name string, startAtSeq int64) error {
 	eventCountSinceSync := 0
 	windowStart := time.Now().UTC().UnixMilli()
 	var lastEvtTime int64 = 0
+	lastSeq := startAtSeq
+	var exitAtSeq int64 = 0
+	running := true
+	cxtWithCancel, cancel := context.WithCancel(ctx)
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
+			lastSeq = evt.Seq
+			if exitAtSeq != 0 && evt.Seq >= exitAtSeq {
+				running = false
+				cancel()
+				return nil;
+			}
 			for _, op := range evt.Ops {
 				parts := strings.SplitN(op.Path, "/", 3)
 				collection := parts[0]
@@ -91,10 +101,12 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 			}
 			eventCountSinceSync++
 			if eventCountSinceSync >= 1000 {
-				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
-					Service: service,
-					Cursor:  evt.Seq,
-				})
+				if startAtSeq == 0 {
+					database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
+						Service: service,
+						Cursor:  evt.Seq,
+					})	
+				}
 				windowEnd := time.Now().UTC().UnixMilli()
 				timeSpent := windowEnd - windowStart
 				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
@@ -106,7 +118,8 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 					toCatchUp = time.Duration(timeSpent * lagTime / caughtUp) * time.Millisecond
 				}
 				fmt.Printf(
-					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up)\n",
+					"[%s] Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up) %d seq\n",
+					name,
 					eventCountSinceSync,
 					time.Duration(timeSpent) * time.Millisecond,
 					1000.0 * float64(eventCountSinceSync) / float64(timeSpent),
@@ -114,6 +127,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 					time.Duration(caughtUp) * time.Millisecond,
 					time.Duration(lagTime) * time.Millisecond,
 					toCatchUp,
+					evt.Seq,
 				)
 				windowStart = windowEnd
 				lastEvtTime = evtTime
@@ -122,14 +136,21 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 			return nil
 		},
 	}
-	for {
-		queryString := ""
-		cursorResult, err := database.Queries.GetCursor(ctx, service)
-		if err != nil {
-			return fmt.Errorf("unable to load cursor: %w", err)
+	cursorResult, err := database.Queries.GetCursor(ctx, service)
+	if err != nil {
+		return fmt.Errorf("unable to load cursor: %w", err)
+	}
+	if len(cursorResult) > 0 {
+		if startAtSeq == 0 {
+			lastSeq = cursorResult[0].Cursor
+		} else {
+			exitAtSeq = cursorResult[0].Cursor
 		}
-		if len(cursorResult) > 0 {
-			queryString = fmt.Sprintf("?cursor=%d", cursorResult[0].Cursor)
+	}
+	for running {
+		queryString := ""
+		if lastSeq != 0 {
+				queryString = fmt.Sprintf("?cursor=%d", lastSeq)
 		}
 		dialer := websocket.DefaultDialer
 		uri := fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos%s", service, queryString)
@@ -144,10 +165,14 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 		eventCountSinceSync = 0
 		windowStart = time.Now().UTC().UnixMilli()
 		lastEvtTime = 0
-		err = events.HandleRepoStream(ctx, con, scheduler)
+		err = events.HandleRepoStream(cxtWithCancel, con, scheduler)
 		if err != nil {
-			fmt.Printf("Error from repo stream: %s\n", err)
-			time.Sleep(time.Duration(5) * time.Second)
+			if running {
+				fmt.Printf("[%s] Error from repo stream: %s\n", name, err)
+				time.Sleep(time.Duration(5) * time.Second)
+			}
 		}
 	}
+	fmt.Printf("[%s] completed\n", name)
+	return nil
 }
