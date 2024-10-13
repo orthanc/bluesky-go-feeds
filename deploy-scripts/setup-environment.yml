@@ -19,13 +19,8 @@
         src: ../feedgenerator
         dest: /opt/feedgenerator/feedgenerator-to-deploy
         mode: '0555'
-    - name: Stop feedgenerator
-      ansible.builtin.service:
-        name: feedgenerator
-        enabled: yes
-        state: stopped
     - name: Swap feedgenerator
-      command: mv /opt/feedgenerator/feedgenerator-to-deploy /opt/feedgenerator/feedgenerator
+      shell: rm /opt/feedgenerator/feedgenerator && mv /opt/feedgenerator/feedgenerator-to-deploy /opt/feedgenerator/feedgenerator
     - name: Start feedgenerator
       ansible.builtin.service:
         name: feedgenerator
