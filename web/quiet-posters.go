@@ -24,13 +24,13 @@ const quietPostersQueryAlgorithmId = "3l6bvwqxjuvit"
 const quietPostersQuery = `
 with
 	"maxPostCount" as (
-		select max("postCount") as cnt, log(max("postCount")) as logCnt
+		select max("postCount") as cnt, ifnull(log(max("postCount")),1) as logCnt
 		from "following"
 		inner join "author" on "following"."following" = "author"."did"
 		where "following"."followedBy" = ?
 	),
 	"authorBoost" as (
-		select "author"."did", 7 - 14 * log("postCount") / (select "logCnt" from "maxPostCount") as "boostScore"
+		select "author"."did", 7 - 14 * ifnull(log("postCount"),0) / (select "logCnt" from "maxPostCount") as "boostScore"
 		from "following"
 		inner join "author" on "following"."following" = "author"."did"
 		where "following"."followedBy" = ?
@@ -70,7 +70,6 @@ func quietPosters(ctx context.Context, database database.Database, session schem
 		}
 		offset = parsedOffset
 	}
-	fmt.Println(session.PostsSince)
 	rows, err := database.QueryContext(ctx, quietPostersQuery, session.UserDid, session.UserDid, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing quietPosters query: %s", err)
