@@ -19,6 +19,8 @@ type quietPostersQueryRow = struct {
   TScore float64
 }
 
+const quietPostersQueryAlgorithmId = "3l6bvwqxjuvit"
+
 const quietPostersQuery = `
 with
 	"maxPostCount" as (

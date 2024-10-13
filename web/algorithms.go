@@ -10,11 +10,11 @@ import (
 
 type algorithm = func(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error)
 
+const testAlgorithmId string = "replies-foll"
+
 var algorithms = map[string]algorithm{
-	"catchup": catchup,
-	"oi8ydnb44i8y": goodStuff,
-	"o1s6niihick9": lovelies,
-	"3l6bvwqxjuvit": quietPosters,
-	// Test feed
-	"replies-foll": 	quietPosters,
+	catchupQueryAlgorithmId: catchup,
+	goodStuffQueryAlgorithmId: goodStuff,
+	loveliesQueryAlgorithmId: lovelies,
+	quietPostersQueryAlgorithmId: quietPosters,
 }

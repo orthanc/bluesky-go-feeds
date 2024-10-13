@@ -20,6 +20,8 @@ type loveliesQueryRow = struct {
   Rating float64
 }
 
+const loveliesQueryAlgorithmId = "o1s6niihick9"
+
 const loveliesQuery = `
 with
   scoredPost as (

@@ -16,6 +16,8 @@ type catchupQueryRow = struct {
   Rating float64
 }
 
+const catchupQueryAlgorithmId = "catchup"
+
 const catchupQuery = `
 select
   "post"."uri",
