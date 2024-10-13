@@ -66,22 +66,14 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	}
 }
 
-func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener, name string, startAtSeq int64) error {
+func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
 	eventCountSinceSync := 0
 	windowStart := time.Now().UTC().UnixMilli()
 	var lastEvtTime int64 = 0
-	lastSeq := startAtSeq
-	var exitAtSeq int64 = 0
-	running := true
-	cxtWithCancel, cancel := context.WithCancel(ctx)
+	var lastSeq int64 = 0
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
 			lastSeq = evt.Seq
-			if exitAtSeq != 0 && evt.Seq >= exitAtSeq {
-				running = false
-				cancel()
-				return nil;
-			}
 			for _, op := range evt.Ops {
 				parts := strings.SplitN(op.Path, "/", 3)
 				collection := parts[0]
@@ -101,12 +93,10 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 			}
 			eventCountSinceSync++
 			if eventCountSinceSync >= 1000 {
-				if startAtSeq == 0 {
-					database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
-						Service: service,
-						Cursor:  evt.Seq,
-					})	
-				}
+				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
+					Service: service,
+					Cursor:  evt.Seq,
+				})	
 				windowEnd := time.Now().UTC().UnixMilli()
 				timeSpent := windowEnd - windowStart
 				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
@@ -118,8 +108,7 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 					toCatchUp = time.Duration(timeSpent * lagTime / caughtUp) * time.Millisecond
 				}
 				fmt.Printf(
-					"[%s] Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up) %d seq\n",
-					name,
+					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up) %d seq\n",
 					eventCountSinceSync,
 					time.Duration(timeSpent) * time.Millisecond,
 					1000.0 * float64(eventCountSinceSync) / float64(timeSpent),
@@ -141,13 +130,9 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 		return fmt.Errorf("unable to load cursor: %w", err)
 	}
 	if len(cursorResult) > 0 {
-		if startAtSeq == 0 {
-			lastSeq = cursorResult[0].Cursor
-		} else {
-			exitAtSeq = cursorResult[0].Cursor
-		}
+		lastSeq = cursorResult[0].Cursor
 	}
-	for running {
+	for {
 		queryString := ""
 		if lastSeq != 0 {
 				queryString = fmt.Sprintf("?cursor=%d", lastSeq)
@@ -165,14 +150,10 @@ func Subscribe(ctx context.Context, service string, database *database.Database,
 		eventCountSinceSync = 0
 		windowStart = time.Now().UTC().UnixMilli()
 		lastEvtTime = 0
-		err = events.HandleRepoStream(cxtWithCancel, con, scheduler)
+		err = events.HandleRepoStream(ctx, con, scheduler)
 		if err != nil {
-			if running {
-				fmt.Printf("[%s] Error from repo stream: %s\n", name, err)
-				time.Sleep(time.Duration(5) * time.Second)
-			}
+			fmt.Printf("Error from repo stream: %s\n", err)
+			time.Sleep(time.Duration(5) * time.Second)
 		}
 	}
-	fmt.Printf("[%s] completed\n", name)
-	return nil
 }
