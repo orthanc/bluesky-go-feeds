@@ -50,6 +50,7 @@ select
     "replyParentAuthor" is null
     or "parentFollowing"."followedBy" = ?
   )
+	and post."indexedAt" >= ?
 	order by "tScore" + "boostScore" / 7 desc
 limit
   ?
@@ -69,7 +70,8 @@ func quietPosters(ctx context.Context, database database.Database, session schem
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, quietPostersQuery, session.UserDid, session.UserDid, session.UserDid, limit, offset)
+	fmt.Println(session.PostsSince)
+	rows, err := database.QueryContext(ctx, quietPostersQuery, session.UserDid, session.UserDid, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing quietPosters query: %s", err)
 	}
