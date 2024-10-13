@@ -1,0 +1,10 @@
+access-key-id:     {{ litestream_access_key }}
+secret-access-key: {{ litestream_secret_access_key }}
+
+dbs:
+  - path: /home/feedgenerator/feed-data.db
+    replicas:
+      - url: s3://{{ litestream_bucket }}/{{ inventory_hostname }}/feed-data.db
+        sync-interval: 10m
+        snapshot-interval: 4h
+        retention: 168h # 7 days
