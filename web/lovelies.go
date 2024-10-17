@@ -55,6 +55,7 @@ from
 where
   "followedBy" = ?
   and "replyParent" is null
+order by "rating" desc
 limit
   ?
 offset
