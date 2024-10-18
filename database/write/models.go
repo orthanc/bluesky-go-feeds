@@ -60,6 +60,16 @@ type PostInteractedByFollowed struct {
 	FollowedRepostCount      float64
 }
 
+type PostInteractedByFollowedAuthor struct {
+	Author                   string
+	User                     string
+	FollowedReplyCount       float64
+	FollowedDirectReplyCount float64
+	FollowedLikeCount        float64
+	FollowedRepostCount      float64
+	FollowedInteractionCount float64
+}
+
 type Repost struct {
 	Uri          string
 	RepostAuthor string
