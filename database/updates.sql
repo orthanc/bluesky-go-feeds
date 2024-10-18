@@ -228,7 +228,7 @@ set
   followed_reply_count = followed_reply_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
 
--- name: SavePosLikedByFollowing :exec
+-- name: SavePostLikedByFollowing :exec
 insert into
   post_interacted_by_followed (
     user,

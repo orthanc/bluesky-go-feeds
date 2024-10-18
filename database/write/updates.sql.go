@@ -308,41 +308,6 @@ func (q *Queries) SaveInteractionWithUser(ctx context.Context, arg SaveInteracti
 	return err
 }
 
-const savePosLikedByFollowing = `-- name: SavePosLikedByFollowing :exec
-insert into
-  post_interacted_by_followed (
-    user,
-    uri,
-    author,
-    indexed_at,
-    followed_like_count,
-    followed_interaction_count
-  )
-values
-  (?, ?, ?, ?, 1, 1) on conflict do
-update
-set
-  followed_like_count = followed_like_count + 1,
-  followed_interaction_count = followed_interaction_count + 1
-`
-
-type SavePosLikedByFollowingParams struct {
-	User      string
-	Uri       string
-	Author    string
-	IndexedAt string
-}
-
-func (q *Queries) SavePosLikedByFollowing(ctx context.Context, arg SavePosLikedByFollowingParams) error {
-	_, err := q.db.ExecContext(ctx, savePosLikedByFollowing,
-		arg.User,
-		arg.Uri,
-		arg.Author,
-		arg.IndexedAt,
-	)
-	return err
-}
-
 const savePost = `-- name: SavePost :exec
 insert into
   post (
@@ -422,6 +387,41 @@ type SavePostDirectRepliedToByFollowingParams struct {
 
 func (q *Queries) SavePostDirectRepliedToByFollowing(ctx context.Context, arg SavePostDirectRepliedToByFollowingParams) error {
 	_, err := q.db.ExecContext(ctx, savePostDirectRepliedToByFollowing,
+		arg.User,
+		arg.Uri,
+		arg.Author,
+		arg.IndexedAt,
+	)
+	return err
+}
+
+const savePostLikedByFollowing = `-- name: SavePostLikedByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_like_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_like_count = followed_like_count + 1,
+  followed_interaction_count = followed_interaction_count + 1
+`
+
+type SavePostLikedByFollowingParams struct {
+	User      string
+	Uri       string
+	Author    string
+	IndexedAt string
+}
+
+func (q *Queries) SavePostLikedByFollowing(ctx context.Context, arg SavePostLikedByFollowingParams) error {
+	_, err := q.db.ExecContext(ctx, savePostLikedByFollowing,
 		arg.User,
 		arg.Uri,
 		arg.Author,

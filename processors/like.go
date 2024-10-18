@@ -73,7 +73,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		}
 
 		for _, followedBy := range authorFollowedBy {
-			err := updates.SavePosLikedByFollowing(ctx, writeSchema.SavePosLikedByFollowingParams{
+			err := updates.SavePostLikedByFollowing(ctx, writeSchema.SavePostLikedByFollowingParams{
 				User: followedBy,
 				Uri: postUri,
 				Author: postAuthor,
