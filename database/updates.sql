@@ -50,6 +50,14 @@ set
 where
   "uri" = ?;
 
+-- name: IncrementPostRepost :exec
+update post
+set
+  repost_count = repost_count + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?;
+
 -- name: DeletePostsBefore :execrows
 delete from post
 where
@@ -243,4 +251,21 @@ values
 update
 set
   followed_like_count = followed_like_count + 1,
+  followed_interaction_count = followed_interaction_count + 1;
+
+-- name: SavePostRepostedByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_repost_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_repost_count = followed_repost_count + 1,
   followed_interaction_count = followed_interaction_count + 1;

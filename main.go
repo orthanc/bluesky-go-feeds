@@ -49,6 +49,10 @@ func main() {
 		Database:     database,
 		AllFollowing: allFollowing,
 	}).Process
+	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
+		Database:     database,
+		AllFollowing: allFollowing,
+	}).Process
 	fmt.Println("Starting")
 	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
 	if err != nil {

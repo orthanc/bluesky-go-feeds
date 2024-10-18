@@ -192,6 +192,20 @@ func (q *Queries) IncrementPostLike(ctx context.Context, uri string) error {
 	return err
 }
 
+const incrementPostRepost = `-- name: IncrementPostRepost :exec
+update post
+set
+  repost_count = repost_count + 1,
+  "interactionCount" = "interactionCount" + 1
+where
+  "uri" = ?
+`
+
+func (q *Queries) IncrementPostRepost(ctx context.Context, uri string) error {
+	_, err := q.db.ExecContext(ctx, incrementPostRepost, uri)
+	return err
+}
+
 const saveAuthor = `-- name: SaveAuthor :exec
 insert into
   author (
@@ -457,6 +471,41 @@ type SavePostRepliedToByFollowingParams struct {
 
 func (q *Queries) SavePostRepliedToByFollowing(ctx context.Context, arg SavePostRepliedToByFollowingParams) error {
 	_, err := q.db.ExecContext(ctx, savePostRepliedToByFollowing,
+		arg.User,
+		arg.Uri,
+		arg.Author,
+		arg.IndexedAt,
+	)
+	return err
+}
+
+const savePostRepostedByFollowing = `-- name: SavePostRepostedByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_repost_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_repost_count = followed_repost_count + 1,
+  followed_interaction_count = followed_interaction_count + 1
+`
+
+type SavePostRepostedByFollowingParams struct {
+	User      string
+	Uri       string
+	Author    string
+	IndexedAt string
+}
+
+func (q *Queries) SavePostRepostedByFollowing(ctx context.Context, arg SavePostRepostedByFollowingParams) error {
+	_, err := q.db.ExecContext(ctx, savePostRepostedByFollowing,
 		arg.User,
 		arg.Uri,
 		arg.Author,
