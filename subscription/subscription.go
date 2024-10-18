@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -66,11 +67,28 @@ func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op 
 	}
 }
 
-func Subscribe(ctx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
+func Subscribe(initialCtx context.Context, service string, database *database.Database, listeners map[string]FirehoseEventListener) error {
 	eventCountSinceSync := 0
 	windowStart := time.Now().UTC().UnixMilli()
 	var lastEvtTime int64 = 0
 	var lastSeq int64 = 0
+	ctx, cancel := context.WithCancel(initialCtx)
+	go func () {
+		ticker := time.NewTicker(time.Minute)
+		for range ticker.C {
+			now := time.Now().UTC()
+			windowOpenFor := time.Duration((now.UnixMilli() - windowStart) * time.Hour.Milliseconds())
+			if windowOpenFor > time.Duration(5 * time.Minute) {
+				log.Printf("No traffic for %s, killing connection\n", windowOpenFor)
+				oldCancel := cancel
+				// Reset the context so that its not cancelled for the retry
+				ctx, cancel = context.WithCancel(initialCtx)
+				oldCancel()
+			} else {
+				log.Printf("Connection health check fine at %s, window open for %s\n", now, windowOpenFor)
+			}
+		}
+	}()
 	rsc := &events.RepoStreamCallbacks{
 		RepoCommit: func(evt *atproto.SyncSubscribeRepos_Commit) error {
 			lastSeq = evt.Seq
