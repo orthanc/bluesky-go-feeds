@@ -35,7 +35,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
-		if !(processor.AllFollowing.IsFollowed(event.Author) ||
+		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
+		authorIsFollowed := len(authorFollowedBy) > 0
+		if !(authorIsFollowed ||
 			processor.AllFollowing.IsFollowed(replyParentAuthor) ||
 			processor.AllFollowing.IsUser(replyParentAuthor) ||
 			processor.AllFollowing.IsFollowed(replyRootAuthor) ||
@@ -49,7 +51,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if processor.AllFollowing.IsFollowed(event.Author) {
+		if authorIsFollowed {
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,
 				Author:            event.Author,
@@ -65,6 +67,32 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			})
 			if err != nil {
 				return err
+			}
+			if (replyParent != "") {
+				for _, followedBy := range authorFollowedBy {
+					err := updates.SavePostDirectRepliedToByFollowing(ctx, writeSchema.SavePostDirectRepliedToByFollowingParams{
+						User: followedBy,
+						Uri: replyParent,
+						Author: replyParentAuthor,
+						IndexedAt: indexedAt,
+					})
+					if err != nil {
+						return err
+					}
+				}
+			}
+			if replyRoot != replyParent {
+				for _, followedBy := range authorFollowedBy {
+					err := updates.SavePostRepliedToByFollowing(ctx, writeSchema.SavePostRepliedToByFollowingParams{
+						User: followedBy,
+						Uri: replyRoot,
+						Author: replyRootAuthor,
+						IndexedAt: indexedAt,
+					})
+					if err != nil {
+						return err
+					}
+				}
 			}
 		}
 		if processor.AllFollowing.IsFollowed(replyParentAuthor) {

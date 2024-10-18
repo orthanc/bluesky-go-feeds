@@ -23,8 +23,11 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		postAuthor := getAuthorFromPostUri(postUri)
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
+		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
+		authorIsFollowed := len(authorFollowedBy) > 0
 		if !(processor.AllFollowing.IsUser(postAuthor) ||
-			processor.AllFollowing.IsFollowed(postAuthor)) {
+			processor.AllFollowing.IsFollowed(postAuthor) ||
+			authorIsFollowed) {
 			return nil
 		}
 
@@ -63,6 +66,18 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 				PostUri:              postUri,
 				Type:                 "like",
 				IndexedAt:            indexedAt,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, followedBy := range authorFollowedBy {
+			err := updates.SavePosLikedByFollowing(ctx, writeSchema.SavePosLikedByFollowingParams{
+				User: followedBy,
+				Uri: postUri,
+				Author: postAuthor,
+				IndexedAt: indexedAt,
 			})
 			if err != nil {
 				return err
