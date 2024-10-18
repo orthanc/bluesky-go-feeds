@@ -14,6 +14,7 @@ type Author struct {
 	MedianReplyCount       float64
 	MedianDirectReplyCount float64
 	MedianInteractionCount float64
+	PostCount              sql.NullFloat64
 }
 
 type Following struct {
@@ -44,6 +45,17 @@ type Post struct {
 	InteractionCount  float64
 	ReplyParentAuthor sql.NullString
 	ReplyRootAuthor   sql.NullString
+}
+
+type PostInteractedByFollowed struct {
+	User                     string
+	Uri                      string
+	Author                   string
+	IndexedAt                string
+	FollowedReplyCount       float64
+	FollowedDirectReplyCount float64
+	FollowedLikeCount        float64
+	FollowedInteractionCount float64
 }
 
 type Repost struct {

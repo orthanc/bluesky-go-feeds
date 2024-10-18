@@ -295,6 +295,41 @@ func (q *Queries) SaveInteractionWithUser(ctx context.Context, arg SaveInteracti
 	return err
 }
 
+const savePosLikedByFollowing = `-- name: SavePosLikedByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_like_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_like_count = followed_like_count + 1,
+  followed_interaction_count = followed_interaction_count + 1
+`
+
+type SavePosLikedByFollowingParams struct {
+	User      string
+	Uri       string
+	Author    string
+	IndexedAt string
+}
+
+func (q *Queries) SavePosLikedByFollowing(ctx context.Context, arg SavePosLikedByFollowingParams) error {
+	_, err := q.db.ExecContext(ctx, savePosLikedByFollowing,
+		arg.User,
+		arg.Uri,
+		arg.Author,
+		arg.IndexedAt,
+	)
+	return err
+}
+
 const savePost = `-- name: SavePost :exec
 insert into
   post (
@@ -341,6 +376,78 @@ func (q *Queries) SavePost(ctx context.Context, arg SavePostParams) error {
 		arg.ReplyParentAuthor,
 		arg.ReplyRoot,
 		arg.ReplyRootAuthor,
+	)
+	return err
+}
+
+const savePostDirectRepliedToByFollowing = `-- name: SavePostDirectRepliedToByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_reply_count,
+    followed_direct_reply_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1, 1) on conflict do
+update
+set
+  followed_reply_count = followed_reply_count + 1,
+  followed_direct_reply_count = followed_direct_reply_count + 1,
+  followed_interaction_count = followed_interaction_count + 1
+`
+
+type SavePostDirectRepliedToByFollowingParams struct {
+	User      string
+	Uri       string
+	Author    string
+	IndexedAt string
+}
+
+func (q *Queries) SavePostDirectRepliedToByFollowing(ctx context.Context, arg SavePostDirectRepliedToByFollowingParams) error {
+	_, err := q.db.ExecContext(ctx, savePostDirectRepliedToByFollowing,
+		arg.User,
+		arg.Uri,
+		arg.Author,
+		arg.IndexedAt,
+	)
+	return err
+}
+
+const savePostRepliedToByFollowing = `-- name: SavePostRepliedToByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_reply_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_reply_count = followed_reply_count + 1,
+  followed_interaction_count = followed_interaction_count + 1
+`
+
+type SavePostRepliedToByFollowingParams struct {
+	User      string
+	Uri       string
+	Author    string
+	IndexedAt string
+}
+
+func (q *Queries) SavePostRepliedToByFollowing(ctx context.Context, arg SavePostRepliedToByFollowingParams) error {
+	_, err := q.db.ExecContext(ctx, savePostRepliedToByFollowing,
+		arg.User,
+		arg.Uri,
+		arg.Author,
+		arg.IndexedAt,
 	)
 	return err
 }
@@ -491,8 +598,7 @@ update user
 set
   "lastSeen" = ?
 where
-  "userDid" = ?
-returning userDid, lastSeen, lastSynced
+  "userDid" = ? returning userDid, lastSeen, lastSynced
 `
 
 type UpdateUserLastSeenParams struct {

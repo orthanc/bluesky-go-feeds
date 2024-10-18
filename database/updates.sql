@@ -111,8 +111,7 @@ update user
 set
   "lastSeen" = ?
 where
-  "userDid" = ?
-returning *;
+  "userDid" = ? returning *;
 
 -- name: DeleteUserWhenNotSeen :execrows
 delete from user
@@ -188,3 +187,56 @@ where
 delete from author
 where
   "did" in (sqlc.slice ('dids'));
+
+-- name: SavePostDirectRepliedToByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_reply_count,
+    followed_direct_reply_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1, 1) on conflict do
+update
+set
+  followed_reply_count = followed_reply_count + 1,
+  followed_direct_reply_count = followed_direct_reply_count + 1,
+  followed_interaction_count = followed_interaction_count + 1;
+
+-- name: SavePostRepliedToByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_reply_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_reply_count = followed_reply_count + 1,
+  followed_interaction_count = followed_interaction_count + 1;
+
+-- name: SavePosLikedByFollowing :exec
+insert into
+  post_interacted_by_followed (
+    user,
+    uri,
+    author,
+    indexed_at,
+    followed_like_count,
+    followed_interaction_count
+  )
+values
+  (?, ?, ?, ?, 1, 1) on conflict do
+update
+set
+  followed_like_count = followed_like_count + 1,
+  followed_interaction_count = followed_interaction_count + 1;
