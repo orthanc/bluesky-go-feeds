@@ -145,6 +145,10 @@ delete from session
 where
   "lastSeen" < ?;
 
+-- name: DeletePostInteractedByFollowedBefore :execrows
+delete from post_interacted_by_followed
+where indexed_at < ?;
+
 -- name: SaveFollowing :exec
 insert into
   following (

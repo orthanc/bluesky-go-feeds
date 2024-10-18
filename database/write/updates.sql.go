@@ -60,6 +60,19 @@ func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexeda
 	return result.RowsAffected()
 }
 
+const deletePostInteractedByFollowedBefore = `-- name: DeletePostInteractedByFollowedBefore :execrows
+delete from post_interacted_by_followed
+where indexed_at < ?
+`
+
+func (q *Queries) DeletePostInteractedByFollowedBefore(ctx context.Context, indexedAt string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deletePostInteractedByFollowedBefore, indexedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deletePostsBefore = `-- name: DeletePostsBefore :execrows
 delete from post
 where

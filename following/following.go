@@ -316,6 +316,11 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	} else {
 		return fmt.Errorf("error purging interactions with user: %w", err)
 	}
+	if rows, err := updates.DeletePostInteractedByFollowedBefore(ctx, purgeBefore); err == nil {
+		fmt.Printf("Deleted %d post interactions by followed\n", rows)
+	} else {
+		return fmt.Errorf("error purging post interactions by followed: %w", err)
+	}
 	tx.Commit()
 
 	usersToDelete, err := allFollowing.database.Queries.ListUsersNotSeenSince(ctx, purgeBefore)
