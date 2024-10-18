@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -24,8 +25,10 @@ type AllFollowing struct {
 
 	userDids         sync.Map
 	followingRecords sync.Map
-	followedByCount  sync.Map
+	followedBy       sync.Map
 }
+
+var emptyFollowedBy []string
 
 func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
 	allFollowing := &AllFollowing{
@@ -57,8 +60,16 @@ func (allFollowing *AllFollowing) IsUser(userDid string) bool {
 }
 
 func (allFollowing *AllFollowing) IsFollowed(authorDid string) bool {
-	value, present := allFollowing.followedByCount.Load(authorDid)
-	return present && value.(int) > 0
+	value, _ := allFollowing.followedBy.Load(authorDid)
+	return value != nil
+}
+
+func (allFollowing *AllFollowing) FollowedBy(authorDid string) []string {
+	value, _ := allFollowing.followedBy.Load(authorDid)
+	if value == nil {
+		return emptyFollowedBy
+	}
+	return *value.(*[]string)
 }
 
 func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
@@ -67,8 +78,9 @@ func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
 		return
 	}
 	for {
-		current, _ := allFollowing.followedByCount.LoadOrStore(record.Following, 0)
-		swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int)+1)
+		current, _ := allFollowing.followedBy.LoadOrStore(record.Following, &emptyFollowedBy)
+		updated := append(slices.Clone(*current.(*[]string)), record.FollowedBy)
+		swapped := allFollowing.followedBy.CompareAndSwap(record.Following, current, &updated)
 		if swapped {
 			break
 		}
@@ -82,18 +94,19 @@ func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following
 	}
 	record := value.(schema.Following)
 	for {
-		current, present := allFollowing.followedByCount.Load(record.Following)
-		if !present {
+		current, _ := allFollowing.followedBy.Load(record.Following)
+		if current == nil {
 			break
 		}
-		newVal := current.(int) - 1
-		if newVal > 0 {
-			swapped := allFollowing.followedByCount.CompareAndSwap(record.Following, current, current.(int)-1)
+		newVal := slices.Clone(*current.(*[]string))
+		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == record.FollowedBy})
+		if len(newVal) > 0 {
+			swapped := allFollowing.followedBy.CompareAndSwap(record.Following, current, &newVal)
 			if swapped {
 				break
 			}
 		} else {
-			deleted := allFollowing.followedByCount.CompareAndDelete(record.Following, current)
+			deleted := allFollowing.followedBy.CompareAndDelete(record.Following, current)
 			if deleted {
 				break
 			}
