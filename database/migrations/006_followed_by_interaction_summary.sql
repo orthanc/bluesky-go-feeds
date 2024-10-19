@@ -124,4 +124,4 @@ drop trigger post_interacted_by_followed_on_update;
 
 drop trigger post_interacted_by_followed_on_delete;
 
-drop table post_interacted_by_followed_author
+drop table post_interacted_by_followed_author;
