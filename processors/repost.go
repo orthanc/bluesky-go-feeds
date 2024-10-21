@@ -20,6 +20,9 @@ func (processor *RepostProcessor) Process(ctx context.Context, event subscriptio
 	switch event.EventKind {
 	case repomgr.EvtKindCreateRecord:
 		postUri := event.Record["subject"].(map[string]any)["uri"].(string)
+		if postUri == "" {
+			return nil;
+		}
 		postAuthor := getAuthorFromPostUri(postUri)
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
