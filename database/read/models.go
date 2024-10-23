@@ -17,6 +17,15 @@ type Author struct {
 	PostCount              sql.NullFloat64
 }
 
+type FollowedInteraction struct {
+	InteractionUri  string
+	Author          string
+	InteractionType string
+	PostAuthorDid   string
+	PostUri         string
+	IndexedAt       string
+}
+
 type Following struct {
 	Uri                  string
 	FollowedBy           string
