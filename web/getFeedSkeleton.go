@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/orthanc/feedgenerator/database"
 	schema "github.com/orthanc/feedgenerator/database/read"
@@ -132,6 +133,16 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		fmt.Printf("Error calling %s for %s: %s", feedUri, userDid, err)
 		w.WriteHeader(500)
 		return
+	}
+	if cursor == "" && len(result.Feed) == 0 && result.Cursor == nil {
+		result.Feed = []*bsky.FeedDefs_SkeletonFeedPost{
+			{
+				Post: "at://did:plc:k626emd4xi4h3wxpd44s4wpk/app.bsky.feed.post/3kbhiodpr4m2d",
+				Reason: &bsky.FeedDefs_SkeletonFeedPost_Reason{
+					FeedDefs_SkeletonReasonPin: &bsky.FeedDefs_SkeletonReasonPin{},
+				},
+			},
+		}
 	}
 
 	data, err := json.Marshal(result)
