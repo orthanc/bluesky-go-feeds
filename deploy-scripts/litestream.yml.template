@@ -5,6 +5,6 @@ dbs:
   - path: /home/feedgenerator/feed-data.db
     replicas:
       - url: s3://{{ litestream_bucket }}/{{ inventory_hostname }}/feed-data.db
-        sync-interval: 10m
+        sync-interval: 1m
         snapshot-interval: 4h
         retention: 168h # 7 days
