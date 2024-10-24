@@ -14,7 +14,7 @@ Environment=FEEDGEN_SUBSCRIPTION_ENDPOINT=wss://bsky.network
 Environment=FEEDGEN_SQLITE_LOCATION="/home/feedgenerator/feed-data.db"
 Environment=FEEDGEN_PUBLISHER_DID={{ feed_publisher_did }}
 Environment=FEEDGEN_HOSTNAME={{ feed_hostname }}
-Environment=GOMEMLIMIT=150MiB
+Environment=GOMEMLIMIT=100MiB
 
 [Install]
 WantedBy=multi-user.target

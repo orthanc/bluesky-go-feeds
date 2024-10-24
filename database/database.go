@@ -28,7 +28,7 @@ type Database struct {
 func connect(ctx context.Context, extraParams string) (*sql.DB, error) {
 	dbLocation := os.Getenv("FEEDGEN_SQLITE_LOCATION")
 	// https://kerkour.com/sqlite-for-servers
-	db, err := sql.Open("sqlite3", fmt.Sprintf("%s?_txlock=immediate&_journal=WAL&_timeout=5000&_sync=1&_cache_size=50000&_fk=true%s", dbLocation, extraParams))
+	db, err := sql.Open("sqlite3", fmt.Sprintf("%s?_txlock=immediate&_journal=WAL&_timeout=5000&_sync=1&_cache_size=25000&_fk=true%s", dbLocation, extraParams))
 	if err != nil {
 		return nil, fmt.Errorf("error creating db at %s: %s", dbLocation, err)
 	}
