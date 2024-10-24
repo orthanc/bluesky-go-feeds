@@ -137,7 +137,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	if cursor == "" && len(result.Feed) == 0 && result.Cursor == nil {
 		result.Feed = []*bsky.FeedDefs_SkeletonFeedPost{
 			{
-				Post: "at://did:plc:k626emd4xi4h3wxpd44s4wpk/app.bsky.feed.post/3kbhiodpr4m2d",
+				Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3l7anu7yoj524",
 				Reason: &bsky.FeedDefs_SkeletonFeedPost_Reason{
 					FeedDefs_SkeletonReasonPin: &bsky.FeedDefs_SkeletonReasonPin{},
 				},
