@@ -82,16 +82,22 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, authorDid := range authors {
+	for ind, authorDid := range authors {
 		err = ratios.UpdateAllMediansForAuthor(ctx, authorDid)
 		if err != nil {
 			return err
 		}
+		if ind % 1000 == 0 {
+			fmt.Printf("Updated %d author medians\n", ind)
+			time.Sleep(250 * time.Millisecond)
+		}
 	}
+	fmt.Println("Updating post counts")
 	err = ratios.UpdatePostCounts(ctx)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Updated post counts")
 	err = ratios.RecalculateInteractionScores(ctx)
 	if err != nil {
 		return err
