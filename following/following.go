@@ -286,7 +286,6 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 
 	for _, record := range records {
 		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
-			Uri: record.Uri,
 			FollowedBy: record.FollowedBy,
 			Following: record.Following,
 		}); err != nil {
@@ -310,27 +309,6 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 	err = tx.Commit()
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-func (allFollowing *AllFollowing) RecordFollower(ctx context.Context, uri string, following string, followedBy string) error {
-	record := schema.Follower{
-		Uri:                  uri,
-		Following:            following,
-		FollowedBy:           followedBy,
-	}
-
-	return allFollowing.saveFollowerPage(ctx, []schema.Follower{record})
-}
-
-func (allFollowing *AllFollowing) RemoveFollower(ctx context.Context, uri string) error {
-	_, ok := allFollowing.removeFollowerData(uri)
-	if ok {
-		err := allFollowing.database.Updates.DeleteFollower(ctx, uri)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

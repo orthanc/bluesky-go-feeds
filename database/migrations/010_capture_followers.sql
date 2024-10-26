@@ -3,6 +3,7 @@ create table follower (
   followed_by varchar not null,
   following varchar not null,
   mutual numeric default 0,
+  lastUpdated varchar not null,
   primary key (followed_by, following),
   constraint fk_follower_user foreign key (following) references user (userDid) on delete cascade
 );

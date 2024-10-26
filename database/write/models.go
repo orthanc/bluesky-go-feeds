@@ -27,9 +27,10 @@ type FollowedInteraction struct {
 }
 
 type Follower struct {
-	FollowedBy string
-	Following  string
-	Mutual     sql.NullFloat64
+	FollowedBy  string
+	Following   string
+	Mutual      sql.NullFloat64
+	Lastupdated string
 }
 
 type Following struct {
