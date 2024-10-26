@@ -49,11 +49,25 @@ func (q *Queries) DeleteFollowing(ctx context.Context, uri string) error {
 const deleteInteractionWithUsersBefore = `-- name: DeleteInteractionWithUsersBefore :execrows
 delete from interactionWithUser
 where
-  "indexedAt" < ?
+  rowid in (
+    select
+      rowid
+    from
+      interactionWithUser
+    where
+      "interactionWithUser"."indexedAt" < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexedat string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteInteractionWithUsersBefore, indexedat)
+type DeleteInteractionWithUsersBeforeParams struct {
+	IndexedAt string
+	Limit     int64
+}
+
+func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, arg DeleteInteractionWithUsersBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteInteractionWithUsersBefore, arg.IndexedAt, arg.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -62,11 +76,26 @@ func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, indexeda
 
 const deletePostInteractedByFollowedBefore = `-- name: DeletePostInteractedByFollowedBefore :execrows
 delete from post_interacted_by_followed
-where indexed_at < ?
+where
+  rowid in (
+    select
+      rowid
+    from
+      post_interacted_by_followed
+    where
+      post_interacted_by_followed.indexed_at < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeletePostInteractedByFollowedBefore(ctx context.Context, indexedAt string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deletePostInteractedByFollowedBefore, indexedAt)
+type DeletePostInteractedByFollowedBeforeParams struct {
+	IndexedAt string
+	Limit     int64
+}
+
+func (q *Queries) DeletePostInteractedByFollowedBefore(ctx context.Context, arg DeletePostInteractedByFollowedBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deletePostInteractedByFollowedBefore, arg.IndexedAt, arg.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -76,11 +105,25 @@ func (q *Queries) DeletePostInteractedByFollowedBefore(ctx context.Context, inde
 const deletePostsBefore = `-- name: DeletePostsBefore :execrows
 delete from post
 where
-  "indexedAt" < ?
+  rowid in (
+    select
+      rowid
+    from
+      post
+    where
+      post."indexedAt" < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeletePostsBefore(ctx context.Context, indexedat string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deletePostsBefore, indexedat)
+type DeletePostsBeforeParams struct {
+	IndexedAt string
+	Limit     int64
+}
+
+func (q *Queries) DeletePostsBefore(ctx context.Context, arg DeletePostsBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deletePostsBefore, arg.IndexedAt, arg.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -90,11 +133,25 @@ func (q *Queries) DeletePostsBefore(ctx context.Context, indexedat string) (int6
 const deleteRepostsBefore = `-- name: DeleteRepostsBefore :execrows
 delete from repost
 where
-  "indexedAt" < ?
+  rowid in (
+    select
+      rowid
+    from
+      repost
+    where
+      repost."indexedAt" < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeleteRepostsBefore(ctx context.Context, indexedat string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteRepostsBefore, indexedat)
+type DeleteRepostsBeforeParams struct {
+	IndexedAt string
+	Limit     int64
+}
+
+func (q *Queries) DeleteRepostsBefore(ctx context.Context, arg DeleteRepostsBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteRepostsBefore, arg.IndexedAt, arg.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -104,11 +161,25 @@ func (q *Queries) DeleteRepostsBefore(ctx context.Context, indexedat string) (in
 const deleteSessionsBefore = `-- name: DeleteSessionsBefore :execrows
 delete from session
 where
-  "lastSeen" < ?
+  rowid in (
+    select
+      rowid
+    from
+      session
+    where
+      session."lastSeen" < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeleteSessionsBefore(ctx context.Context, lastseen string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteSessionsBefore, lastseen)
+type DeleteSessionsBeforeParams struct {
+	LastSeen string
+	Limit    int64
+}
+
+func (q *Queries) DeleteSessionsBefore(ctx context.Context, arg DeleteSessionsBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteSessionsBefore, arg.LastSeen, arg.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -118,11 +189,25 @@ func (q *Queries) DeleteSessionsBefore(ctx context.Context, lastseen string) (in
 const deleteUserInteractionsBefore = `-- name: DeleteUserInteractionsBefore :execrows
 delete from userInteraction
 where
-  "indexedAt" < ?
+  rowid in (
+    select
+      rowid
+    from
+      userInteraction
+    where
+      "userInteraction"."indexedAt" < ?
+    limit
+      ?
+  )
 `
 
-func (q *Queries) DeleteUserInteractionsBefore(ctx context.Context, indexedat string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteUserInteractionsBefore, indexedat)
+type DeleteUserInteractionsBeforeParams struct {
+	IndexedAt string
+	Limit     int64
+}
+
+func (q *Queries) DeleteUserInteractionsBefore(ctx context.Context, arg DeleteUserInteractionsBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserInteractionsBefore, arg.IndexedAt, arg.Limit)
 	if err != nil {
 		return 0, err
 	}

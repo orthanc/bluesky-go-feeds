@@ -61,12 +61,30 @@ where
 -- name: DeletePostsBefore :execrows
 delete from post
 where
-  "indexedAt" < ?;
+  rowid in (
+    select
+      rowid
+    from
+      post
+    where
+      post."indexedAt" < ?
+    limit
+      ?
+  );
 
 -- name: DeleteRepostsBefore :execrows
 delete from repost
 where
-  "indexedAt" < ?;
+  rowid in (
+    select
+      rowid
+    from
+      repost
+    where
+      repost."indexedAt" < ?
+    limit
+      ?
+  );
 
 -- name: SaveUserInteraction :exec
 insert into
@@ -84,7 +102,16 @@ values
 -- name: DeleteUserInteractionsBefore :execrows
 delete from userInteraction
 where
-  "indexedAt" < ?;
+  rowid in (
+    select
+      rowid
+    from
+      userInteraction
+    where
+      "userInteraction"."indexedAt" < ?
+    limit
+      ?
+  );
 
 -- name: SaveInteractionWithUser :exec
 insert into
@@ -102,7 +129,16 @@ values
 -- name: DeleteInteractionWithUsersBefore :execrows
 delete from interactionWithUser
 where
-  "indexedAt" < ?;
+  rowid in (
+    select
+      rowid
+    from
+      interactionWithUser
+    where
+      "interactionWithUser"."indexedAt" < ?
+    limit
+      ?
+  );
 
 -- name: SaveUser :exec
 insert into
@@ -151,11 +187,30 @@ where
 -- name: DeleteSessionsBefore :execrows
 delete from session
 where
-  "lastSeen" < ?;
+  rowid in (
+    select
+      rowid
+    from
+      session
+    where
+      session."lastSeen" < ?
+    limit
+      ?
+  );
 
 -- name: DeletePostInteractedByFollowedBefore :execrows
 delete from post_interacted_by_followed
-where indexed_at < ?;
+where
+  rowid in (
+    select
+      rowid
+    from
+      post_interacted_by_followed
+    where
+      post_interacted_by_followed.indexed_at < ?
+    limit
+      ?
+  );
 
 -- name: SaveFollowing :exec
 insert into

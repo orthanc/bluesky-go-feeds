@@ -30,6 +30,8 @@ type AllFollowing struct {
 
 var emptyFollowedBy []string
 
+const purgePageSize = 10000;
+
 func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
 	allFollowing := &AllFollowing{
 		database: database,
@@ -283,45 +285,91 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 	return nil
 }
 
-func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
-	purgeBefore := time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
-	updates, tx, err := allFollowing.database.BeginTx(ctx)
-	if err != nil {
-		return err
+func pagedPurge(messageTemplate string, deletePage func () (int64, error)) (int64, error) {
+	var count int64 = 0
+	var pages int64 = 0
+	for {
+		rows, err := deletePage()
+		if err != nil {
+			return count, err
+		}
+		count += rows
+		pages++
+		if rows < purgePageSize {
+			fmt.Printf(messageTemplate + " in %d pages\n", count, pages)
+			return count, nil
+		}
+		if pages % 10 == 0 {
+			fmt.Printf(messageTemplate + " page %d\n", count, pages)
+		}
+		time.Sleep(250 * time.Millisecond)
 	}
-	defer tx.Rollback()
+}
+
+func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
+	purgeBefore := time.Now().UTC().Add(-5 * 24 * time.Hour).Format(time.RFC3339)
+	updates := allFollowing.database.Updates
 	fmt.Printf("Purging data before %s\n", purgeBefore)
-	if rows, err := updates.DeletePostsBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d posts\n", rows)
-	} else {
+
+	_, err := pagedPurge("Deleted %d posts", func() (int64, error) {
+		return updates.DeletePostsBefore(ctx, writeSchema.DeletePostsBeforeParams{
+			IndexedAt: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
 		return fmt.Errorf("error purging posts: %w", err)
 	}
-	if rows, err := updates.DeleteRepostsBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d reposts\n", rows)
-	} else {
+
+	_, err = pagedPurge("Deleted %d reposts", func() (int64, error) {
+		return updates.DeleteRepostsBefore(ctx, writeSchema.DeleteRepostsBeforeParams{
+			IndexedAt: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
 		return fmt.Errorf("error purging reposts: %w", err)
 	}
-	if rows, err := updates.DeleteSessionsBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d sessions\n", rows)
-	} else {
+
+	_, err = pagedPurge("Deleted %d sessions", func() (int64, error) {
+		return updates.DeleteSessionsBefore(ctx, writeSchema.DeleteSessionsBeforeParams{
+			LastSeen: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
 		return fmt.Errorf("error purging sessions: %w", err)
 	}
-	if rows, err := updates.DeleteUserInteractionsBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d user interactions\n", rows)
-	} else {
+
+	_, err = pagedPurge("Deleted %d user interactions", func() (int64, error) {
+		return updates.DeleteUserInteractionsBefore(ctx, writeSchema.DeleteUserInteractionsBeforeParams{
+			IndexedAt: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
 		return fmt.Errorf("error purging user interactions: %w", err)
 	}
-	if rows, err := updates.DeleteInteractionWithUsersBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d interactions with user\n", rows)
-	} else {
+
+	_, err = pagedPurge("Deleted %d interactions with user", func() (int64, error) {
+		return updates.DeleteInteractionWithUsersBefore(ctx, writeSchema.DeleteInteractionWithUsersBeforeParams{
+			IndexedAt: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
 		return fmt.Errorf("error purging interactions with user: %w", err)
 	}
-	if rows, err := updates.DeletePostInteractedByFollowedBefore(ctx, purgeBefore); err == nil {
-		fmt.Printf("Deleted %d post interactions by followed\n", rows)
-	} else {
-		return fmt.Errorf("error purging post interactions by followed: %w", err)
+
+	_, err = pagedPurge("Deleted %d interactions by followed", func() (int64, error) {
+		return updates.DeletePostInteractedByFollowedBefore(ctx, writeSchema.DeletePostInteractedByFollowedBeforeParams{
+			IndexedAt: purgeBefore,
+			Limit: purgePageSize,
+		})
+	})
+	if err != nil {
+		return fmt.Errorf("error purging interactions by followed: %w", err)
 	}
-	tx.Commit()
 
 	usersToDelete, err := allFollowing.database.Queries.ListUsersNotSeenSince(ctx, purgeBefore)
 	if err != nil {
