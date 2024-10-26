@@ -11,7 +11,7 @@ import (
 )
 
 type youMightLikeQueryRow = struct {
-	Uri string
+	Uri    string
 	TScore string
 }
 
@@ -27,12 +27,10 @@ from
   post_interacted_by_followed as post
   left join post_interacted_by_followed_author as author on post.author = author.author
   and post.user = author.user
-  left join following on following.following = post.author
-  and following.followedBy = ?
 where
   post.user = ?
   and post.author <> ?
-  and following.followedBy is null
+	and author.followed = 0
 order by
   10 * post.followed_interaction_count + author.followed_interaction_count + 100 * t_score DESC
 limit
@@ -43,8 +41,8 @@ offset
 
 func youMightLike(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
 	output := bsky.FeedGetFeedSkeleton_Output{
-    Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
-  }
+		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
+	}
 	offset := 0
 	if cursor != "" {
 		parsedOffset, err := strconv.Atoi(cursor)
@@ -53,7 +51,7 @@ func youMightLike(ctx context.Context, database database.Database, session schem
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, session.UserDid, session.UserDid, limit, offset)
+	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, session.UserDid, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing youMightLike query: %s", err)
 	}
