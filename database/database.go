@@ -48,9 +48,6 @@ func NewDatabase(ctx context.Context) (*Database, error) {
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, fmt.Errorf("error setting goose dialect: %s", err)
 	}
-	if err := goose.Up(writeDB, "migrations"); err != nil {
-		return nil, fmt.Errorf("error updating schema: %s", err)
-	}
 
 	readDB, err := connect(ctx, "&mode=ro")
 	if err != nil {
@@ -65,6 +62,20 @@ func NewDatabase(ctx context.Context) (*Database, error) {
 		Updates: write.New(writeDB),
 	}
 	return &database, nil
+}
+
+func (database *Database) MigrateUp(_ context.Context) error {
+	if err := goose.Up(database.writeDB, "migrations"); err != nil {
+		return fmt.Errorf("error updating schema: %s", err)
+	}
+	return nil
+}
+
+func (database *Database) MigrateDown(_ context.Context) error {
+	if err := goose.Down(database.writeDB, "migrations"); err != nil {
+		return fmt.Errorf("error updating schema: %s", err)
+	}
+	return nil
 }
 
 func (database *Database) BeginTx(ctx context.Context) (*write.Queries, *sql.Tx, error) {

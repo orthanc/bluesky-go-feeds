@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"sync"
@@ -20,10 +21,27 @@ import (
 
 func main() {
 	ctx := context.Background()
+	dbDown := flag.Bool("db-down", false, "migrate the database down one revision then exit");
+	dbUp := flag.Bool("db-up", false, "migrate the database up to the latest revision then exit");
+	flag.Parse()
 
 	database, err := database.NewDatabase(ctx)
 	if err != nil {
 		panic(err)
+	}
+	if *dbDown {
+		err := database.MigrateDown(ctx)
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
+	err = database.MigrateUp(ctx)
+	if err != nil {
+		panic(err)
+	}
+	if *dbUp {
+		return
 	}
 
 	batchMutex := &sync.Mutex{}
