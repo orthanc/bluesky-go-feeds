@@ -231,17 +231,11 @@ where
 -- name: SaveFollower :exec
 insert into
   follower (
-    uri,
     followed_by,
     following
   )
 values
-  (?, ?, ?) on conflict do nothing;
-
--- name: DeleteFollower :exec
-delete from follower
-where
-  uri = ?;
+  (?, ?) on conflict do nothing;
 
 -- name: SaveAuthor :exec
 insert into

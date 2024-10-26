@@ -27,7 +27,6 @@ type FollowedInteraction struct {
 }
 
 type Follower struct {
-	Uri        string
 	FollowedBy string
 	Following  string
 	Mutual     sql.NullFloat64
