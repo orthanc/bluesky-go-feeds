@@ -26,11 +26,19 @@ type FollowedInteraction struct {
 	IndexedAt       string
 }
 
+type Follower struct {
+	Uri        string
+	FollowedBy string
+	Following  string
+	Mutual     sql.NullFloat64
+}
+
 type Following struct {
 	Uri                  string
 	FollowedBy           string
 	Following            string
 	UserInteractionRatio sql.NullFloat64
+	Mutual               sql.NullFloat64
 }
 
 type InteractionWithUser struct {
@@ -77,6 +85,7 @@ type PostInteractedByFollowedAuthor struct {
 	FollowedLikeCount        float64
 	FollowedRepostCount      float64
 	FollowedInteractionCount float64
+	Followed                 sql.NullFloat64
 }
 
 type Repost struct {

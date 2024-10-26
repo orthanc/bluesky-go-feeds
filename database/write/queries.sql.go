@@ -129,7 +129,7 @@ func (q *Queries) ListAllAuthors(ctx context.Context) ([]string, error) {
 
 const listAllFollowing = `-- name: ListAllFollowing :many
 select
-  uri, followedBy, "following", userInteractionRatio
+  uri, followedBy, "following", userInteractionRatio, mutual
 from
   following
 `
@@ -148,6 +148,7 @@ func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
 			&i.FollowedBy,
 			&i.Following,
 			&i.UserInteractionRatio,
+			&i.Mutual,
 		); err != nil {
 			return nil, err
 		}

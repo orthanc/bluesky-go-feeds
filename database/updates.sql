@@ -228,6 +228,21 @@ delete from following
 where
   uri = ?;
 
+-- name: SaveFollower :exec
+insert into
+  follower (
+    uri,
+    followed_by,
+    following
+  )
+values
+  (?, ?, ?) on conflict do nothing;
+
+-- name: DeleteFollower :exec
+delete from follower
+where
+  uri = ?;
+
 -- name: SaveAuthor :exec
 insert into
   author (
