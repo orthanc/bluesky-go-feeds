@@ -26,16 +26,19 @@ type AllFollowing struct {
 	userDids         sync.Map
 	followingRecords sync.Map
 	followedBy       sync.Map
+
+	batchMutex *sync.Mutex
 }
 
 var emptyFollowedBy []string
 
 const purgePageSize = 10000;
 
-func NewAllFollowing(database *database.Database, client *xrpc.Client) *AllFollowing {
+func NewAllFollowing(database *database.Database, client *xrpc.Client, batchMutex *sync.Mutex) *AllFollowing {
 	allFollowing := &AllFollowing{
 		database: database,
 		client:   client,
+		batchMutex: batchMutex,
 	}
 
 	ctx := context.Background()
@@ -307,6 +310,8 @@ func pagedPurge(messageTemplate string, deletePage func () (int64, error)) (int6
 }
 
 func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
+	allFollowing.batchMutex.Lock()
+	defer allFollowing.batchMutex.Unlock()
 	purgeBefore := time.Now().UTC().Add(-5 * 24 * time.Hour).Format(time.RFC3339)
 	updates := allFollowing.database.Updates
 	fmt.Printf("Purging data before %s\n", purgeBefore)

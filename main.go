@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
@@ -25,15 +26,17 @@ func main() {
 		panic(err)
 	}
 
+	batchMutex := &sync.Mutex{}
 	client := xrpc.Client{
 		Host: "https://bsky.social",
 	}
 	allFollowing := following.NewAllFollowing(
 		database,
 		&client,
+		batchMutex,
 	)
 	allFollowing.Hydrate(ctx)
-	ratios.NewRatios(database)
+	ratios.NewRatios(database, batchMutex)
 
 	go web.StartServer(database, allFollowing)
 	firehoseListeners := make(map[string]subscription.FirehoseEventListener)

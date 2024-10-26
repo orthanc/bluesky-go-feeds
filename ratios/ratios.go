@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
@@ -13,11 +14,13 @@ import (
 
 type Ratios struct {
 	database *database.Database
+	batchMutex *sync.Mutex
 }
 
-func NewRatios(database *database.Database) *Ratios {
+func NewRatios(database *database.Database, batchMutex *sync.Mutex) *Ratios {
 	ratios := &Ratios{
 		database: database,
+		batchMutex: batchMutex,
 	}
 	ctx := context.Background()
 	
@@ -77,6 +80,8 @@ update "author" set "postCount" = (select count(*) from "post" where "post"."aut
 // }
 
 func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
+	ratios.batchMutex.Lock()
+	defer ratios.batchMutex.Unlock()
 	fmt.Println("Starting updating all ratios")
 	authors, err := ratios.database.Queries.ListAllAuthors(ctx)
 	if err != nil {
