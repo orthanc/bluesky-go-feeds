@@ -25,11 +25,10 @@ select
   ) / (24.0 * 3600) as t_score
 from
   post_interacted_by_followed as post
-  left join post_interacted_by_followed_author as author on post.author = author.author
-  and post.user = author.user
+  left join post_interacted_by_followed_author as author on post.author = author.author and post.user = author.user
 where
   post.user = ?
-  and post.author <> ?
+  and post.author <> post.user
 	and author.followed = 0
 order by
   10 * post.followed_interaction_count + author.followed_interaction_count + 100 * t_score DESC
@@ -51,7 +50,7 @@ func youMightLike(ctx context.Context, database database.Database, session schem
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, session.UserDid, limit, offset)
+	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing youMightLike query: %s", err)
 	}
