@@ -21,7 +21,7 @@ type goodStuffQueryRow = struct {
   Rating float64
 }
 
-const goodStuffQueryAlgorithmId = "oi8ydnb44i8y"
+const goodStuffAlgorithmId = "oi8ydnb44i8y"
 
 const goodStuffQuery = `
 -- name: GoodStuffFeed :many

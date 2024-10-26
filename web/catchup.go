@@ -16,7 +16,7 @@ type catchupQueryRow = struct {
   Rating float64
 }
 
-const catchupQueryAlgorithmId = "catchup"
+const catchupAlgorithmId = "catchup"
 
 const catchupQuery = `
 select

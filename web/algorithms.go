@@ -13,9 +13,9 @@ type algorithm = func(ctx context.Context, database database.Database, session s
 const testAlgorithmId string = "replies-foll"
 
 var algorithms = map[string]algorithm{
-	catchupQueryAlgorithmId: catchup,
-	goodStuffQueryAlgorithmId: goodStuff,
-	loveliesQueryAlgorithmId: lovelies,
-	quietPostersQueryAlgorithmId: quietPosters,
-	youMightLikeQueryAlgorithmId: youMightLike,
+	catchupAlgorithmId: catchup,
+	goodStuffAlgorithmId: goodStuff,
+	loveliesAlgorithmId: lovelies,
+	quietPostersAlgorithmId: quietPosters,
+	youMightLikeAlgorithmId: youMightLike,
 }

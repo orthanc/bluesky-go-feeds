@@ -15,7 +15,7 @@ type youMightLikeQueryRow = struct {
 	TScore string
 }
 
-const youMightLikeQueryAlgorithmId = "3l6te6ptx5l3c"
+const youMightLikeAlgorithmId = "3l6te6ptx5l3c"
 
 const youMightLikeQuery = `
 select
