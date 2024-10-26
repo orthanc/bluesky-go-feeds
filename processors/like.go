@@ -21,6 +21,9 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 	case repomgr.EvtKindCreateRecord:
 		postUri := event.Record["subject"].(map[string]any)["uri"].(string)
 		postAuthor := getAuthorFromPostUri(postUri)
+		if postAuthor == "" {
+			return nil
+		}
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
 		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
