@@ -146,7 +146,12 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 	defer tx.Rollback()
 
 	for _, record := range records {
-		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams(record)); err != nil {
+		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams{
+			Uri: record.Uri,
+			FollowedBy: record.FollowedBy,
+			Following: record.Following,
+			UserInteractionRatio: record.UserInteractionRatio,
+		}); err != nil {
 			return err
 		}
 
@@ -219,6 +224,34 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		}
 		return true
 	})
+
+
+	followers := make([]schema.Follower, 0, 100)
+	followersFromSync := make(map[string]bool)
+	for cursor := ""; ; {
+		followersResult, err := bsky.GraphGetFollowers(ctx, allFollowing.client, user.UserDid, cursor, 100)
+		if err != nil {
+			return err
+		}
+
+		followers = followers[:len(followersResult.Followers)]
+		for i, record := range followersResult.Followers {
+			followers[i] = schema.Follower{
+				Following:            user.UserDid,
+				FollowedBy:           record.Did,
+			}
+			followersFromSync[followers[i].FollowedBy] = true
+		}
+		err = allFollowing.saveFollowerPage(ctx, followers)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Saved Page")
+		if followersResult.Cursor == nil {
+			break
+		}
+		cursor = *followersResult.Cursor
+	}
 	return nil
 }
 
@@ -237,6 +270,64 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 	_, ok := allFollowing.removeFollowData(uri)
 	if ok {
 		err := allFollowing.database.Updates.DeleteFollowing(ctx, uri)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records []schema.Follower) error {
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, record := range records {
+		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
+			Uri: record.Uri,
+			FollowedBy: record.FollowedBy,
+			Following: record.Following,
+		}); err != nil {
+			return err
+		}
+
+		author := writeSchema.SaveAuthorParams{
+			Did:                    record.FollowedBy,
+			MedianDirectReplyCount: 0,
+			MedianInteractionCount: 0,
+			MedianLikeCount:        0,
+			MedianReplyCount:       0,
+		}
+		if err := updates.SaveAuthor(ctx, author); err != nil {
+			return err
+		}
+
+		allFollowing.addFollowerData(record)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (allFollowing *AllFollowing) RecordFollower(ctx context.Context, uri string, following string, followedBy string) error {
+	record := schema.Follower{
+		Uri:                  uri,
+		Following:            following,
+		FollowedBy:           followedBy,
+	}
+
+	return allFollowing.saveFollowerPage(ctx, []schema.Follower{record})
+}
+
+func (allFollowing *AllFollowing) RemoveFollower(ctx context.Context, uri string) error {
+	_, ok := allFollowing.removeFollowerData(uri)
+	if ok {
+		err := allFollowing.database.Updates.DeleteFollower(ctx, uri)
 		if err != nil {
 			return err
 		}
