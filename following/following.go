@@ -312,7 +312,7 @@ func pagedPurge(messageTemplate string, deletePage func () (int64, error)) (int6
 func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	allFollowing.batchMutex.Lock()
 	defer allFollowing.batchMutex.Unlock()
-	purgeBefore := time.Now().UTC().Add(-5 * 24 * time.Hour).Format(time.RFC3339)
+	purgeBefore := time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
 	updates := allFollowing.database.Updates
 	fmt.Printf("Purging data before %s\n", purgeBefore)
 
