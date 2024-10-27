@@ -33,7 +33,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	feedUri := syntax.ATURI(r.URL.Query().Get("feed"))
 	algKey := feedUri.RecordKey().String()
 	if algKey == testAlgorithmId {
-		algKey = youMightLikeAlgorithmId
+		algKey = catchupAlgorithmId
 	}
 	alg := algorithms[algKey]
 	if feedUri.Authority().String() != PublisherDid || feedUri.Collection() != "app.bsky.feed.generator" || alg == nil {

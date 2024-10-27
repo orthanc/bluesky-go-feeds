@@ -17,8 +17,10 @@ type catchupQueryRow = struct {
 }
 
 const catchupAlgorithmId = "catchup"
+const catchupMutualsAlgorithmId = "3l7hnqx43hpea"
+const catchupFollowersAlgorithmId = "3l7hnrrppswb3"
 
-const catchupQuery = `
+const catchupQueryPrefix = `
 select
   "post"."uri",
   "post"."indexedAt",
@@ -32,6 +34,8 @@ from
 where
   "following"."followedBy" = ?
   and "post"."indexedAt" >= ?
+`
+const catchupQuerySuffix = `
 order by
   "rating" desc,
   "indexedAt" desc
@@ -41,7 +45,28 @@ offset
   ?
 `
 
-func catchup(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+const catchupQuery = catchupQueryPrefix + catchupQuerySuffix
+const catchupMutualsQuery = catchupQueryPrefix + `
+  and following.mutual > 0
+` + catchupQuerySuffix
+const catchupFollowersQuery = `
+select
+	"post"."uri",
+	"post"."indexedAt",
+	(
+		"post"."interactionCount" - "author"."medianInteractionCount"
+	) * 1000 / ("author"."medianInteractionCount" + 1) as "rating"
+from
+	"post"
+	inner join "author" on "post"."author" = "author"."did"
+	inner join follower on "post"."author" = follower.followed_by
+where
+	follower.following = ?
+	and "post"."indexedAt" >= ?
+  and follower.mutual = 0
+` + catchupQuerySuffix
+
+func catchupVariant(name string, query string, ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
 	output := bsky.FeedGetFeedSkeleton_Output{
 		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}
@@ -53,9 +78,9 @@ func catchup(ctx context.Context, database database.Database, session schema.Ses
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, catchupQuery, session.UserDid, session.PostsSince, limit, offset)
+	rows, err := database.QueryContext(ctx, query, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
-		return output, fmt.Errorf("error executing catchup query: %s", err)
+		return output, fmt.Errorf("error executing %s query: %s", name, err)
 	}
 	defer rows.Close()
 	var row catchupQueryRow
@@ -79,4 +104,16 @@ func catchup(ctx context.Context, database database.Database, session schema.Ses
 		output.Cursor = &nextCursor
 	}
 	return output, nil
+}
+
+func catchup(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	return catchupVariant("catchup", catchupQuery, ctx, database, session, cursor, limit)
+}
+
+func catchupMutuals(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	return catchupVariant("catchupMutuals", catchupMutualsQuery, ctx, database, session, cursor, limit)
+}
+
+func catchupFollowers(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	return catchupVariant("catchupFollowers", catchupFollowersQuery, ctx, database, session, cursor, limit)
 }
