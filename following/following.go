@@ -72,6 +72,15 @@ func (allFollowing *AllFollowing) IsFollowed(authorDid string) bool {
 	return value != nil
 }
 
+func (allFollowing *AllFollowing) IsFollower(authorDid string) bool {
+	value, _ := allFollowing.followers.Load(authorDid)
+	return value != nil
+}
+
+func (allFollowing *AllFollowing) IsAuthor(authorDid string) bool {
+	return allFollowing.IsFollowed(authorDid) || allFollowing.IsFollower(authorDid)
+}
+
 func (allFollowing *AllFollowing) FollowedBy(authorDid string) []string {
 	value, _ := allFollowing.followedBy.Load(authorDid)
 	if value == nil {
@@ -125,32 +134,32 @@ func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following
 
 func (allFollowing *AllFollowing) addFollowerData(record schema.Follower) {
 	for {
-		current, _ := allFollowing.followers.LoadOrStore(record.Following, &emptyFollowedBy)
-		updated := append(slices.Clone(*current.(*[]string)), record.FollowedBy)
-		swapped := allFollowing.followers.CompareAndSwap(record.Following, current, &updated)
+		current, _ := allFollowing.followers.LoadOrStore(record.FollowedBy, &emptyFollowedBy)
+		updated := append(slices.Clone(*current.(*[]string)), record.Following)
+		swapped := allFollowing.followers.CompareAndSwap(record.FollowedBy, current, &updated)
 		if swapped {
 			break
 		}
 	}
 }
 
-func (allFollowing *AllFollowing) removeFollowerData(following string, followedBy string) {
+func (allFollowing *AllFollowing) removeFollowerData(following string, followedBy string) bool {
 	for {
-		current, _ := allFollowing.followers.Load(following)
-		if current == nil {
-			break
+		current, _ := allFollowing.followers.Load(followedBy)
+		if current == nil || slices.Index(*current.(*[]string), following) == -1 {
+			return false
 		}
 		newVal := slices.Clone(*current.(*[]string))
-		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == followedBy})
+		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == following})
 		if len(newVal) > 0 {
-			swapped := allFollowing.followers.CompareAndSwap(following, current, &newVal)
+			swapped := allFollowing.followers.CompareAndSwap(followedBy, current, &newVal)
 			if swapped {
-				break
+				return true
 			}
 		} else {
-			deleted := allFollowing.followers.CompareAndDelete(following, current)
+			deleted := allFollowing.followers.CompareAndDelete(followedBy, current)
 			if deleted {
-				break
+				return true
 			}
 		}
 	}
@@ -429,9 +438,17 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 		following := value.(schema.Following)
 		if following.FollowedBy == userDid {
 			allFollowing.removeFollowData(following.Uri)
-			if !allFollowing.IsFollowed(following.Following) {
+			if !allFollowing.IsAuthor(following.Following) {
 				authorsToDelete = append(authorsToDelete, following.Following)
 			}
+		}
+		return true
+	})
+	allFollowing.followers.Range(func (key any, value any) bool {
+		followedBy := key.(string)
+		removed := allFollowing.removeFollowerData(userDid, followedBy)
+		if removed && !allFollowing.IsAuthor(followedBy) {
+			authorsToDelete = append(authorsToDelete, followedBy)
 		}
 		return true
 	})
