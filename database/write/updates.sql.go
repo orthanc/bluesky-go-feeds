@@ -35,6 +35,25 @@ func (q *Queries) DeleteAuthorsByDid(ctx context.Context, dids []string) (int64,
 	return result.RowsAffected()
 }
 
+const deleteFollower = `-- name: DeleteFollower :exec
+delete from follower
+where
+  following = ?
+  and followed_by = ?
+  and last_recorded < ?
+`
+
+type DeleteFollowerParams struct {
+	Following    string
+	FollowedBy   string
+	LastRecorded string
+}
+
+func (q *Queries) DeleteFollower(ctx context.Context, arg DeleteFollowerParams) error {
+	_, err := q.db.ExecContext(ctx, deleteFollower, arg.Following, arg.FollowedBy, arg.LastRecorded)
+	return err
+}
+
 const deleteFollowing = `-- name: DeleteFollowing :exec
 delete from following
 where
@@ -345,21 +364,22 @@ func (q *Queries) SaveCursor(ctx context.Context, arg SaveCursorParams) error {
 
 const saveFollower = `-- name: SaveFollower :exec
 insert into
-  follower (
-    followed_by,
-    following
-  )
+  follower (followed_by, following, last_recorded)
 values
-  (?, ?) on conflict do nothing
+  (?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded
 `
 
 type SaveFollowerParams struct {
-	FollowedBy string
-	Following  string
+	FollowedBy   string
+	Following    string
+	LastRecorded string
 }
 
 func (q *Queries) SaveFollower(ctx context.Context, arg SaveFollowerParams) error {
-	_, err := q.db.ExecContext(ctx, saveFollower, arg.FollowedBy, arg.Following)
+	_, err := q.db.ExecContext(ctx, saveFollower, arg.FollowedBy, arg.Following, arg.LastRecorded)
 	return err
 }
 

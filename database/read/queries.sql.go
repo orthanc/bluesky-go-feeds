@@ -127,6 +127,41 @@ func (q *Queries) ListAllAuthors(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listAllFollowers = `-- name: ListAllFollowers :many
+select
+  followed_by, "following", mutual, last_recorded
+from
+  follower
+`
+
+func (q *Queries) ListAllFollowers(ctx context.Context) ([]Follower, error) {
+	rows, err := q.db.QueryContext(ctx, listAllFollowers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Follower
+	for rows.Next() {
+		var i Follower
+		if err := rows.Scan(
+			&i.FollowedBy,
+			&i.Following,
+			&i.Mutual,
+			&i.LastRecorded,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllFollowing = `-- name: ListAllFollowing :many
 select
   uri, followedBy, "following", userInteractionRatio, mutual
@@ -183,6 +218,52 @@ func (q *Queries) ListAllUsers(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 		items = append(items, userDid)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFollowerLastRecordedBefore = `-- name: ListFollowerLastRecordedBefore :many
+select
+  following,
+  followed_by,
+  last_recorded
+from
+  follower
+where
+  following = ?
+  and last_recorded < ?
+`
+
+type ListFollowerLastRecordedBeforeParams struct {
+	Following    string
+	LastRecorded string
+}
+
+type ListFollowerLastRecordedBeforeRow struct {
+	Following    string
+	FollowedBy   string
+	LastRecorded string
+}
+
+func (q *Queries) ListFollowerLastRecordedBefore(ctx context.Context, arg ListFollowerLastRecordedBeforeParams) ([]ListFollowerLastRecordedBeforeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFollowerLastRecordedBefore, arg.Following, arg.LastRecorded)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFollowerLastRecordedBeforeRow
+	for rows.Next() {
+		var i ListFollowerLastRecordedBeforeRow
+		if err := rows.Scan(&i.Following, &i.FollowedBy, &i.LastRecorded); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

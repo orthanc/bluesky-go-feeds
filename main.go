@@ -48,9 +48,13 @@ func main() {
 	client := xrpc.Client{
 		Host: "https://bsky.social",
 	}
+	publicClient := xrpc.Client{
+		Host: "https://public.api.bsky.app",
+	}
 	allFollowing := following.NewAllFollowing(
 		database,
 		&client,
+		&publicClient,
 		batchMutex,
 	)
 	allFollowing.Hydrate(ctx)

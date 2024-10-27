@@ -230,12 +230,19 @@ where
 
 -- name: SaveFollower :exec
 insert into
-  follower (
-    followed_by,
-    following
-  )
+  follower (followed_by, following, last_recorded)
 values
-  (?, ?) on conflict do nothing;
+  (?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded;
+
+-- name: DeleteFollower :exec
+delete from follower
+where
+  following = ?
+  and followed_by = ?
+  and last_recorded < ?;
 
 -- name: SaveAuthor :exec
 insert into

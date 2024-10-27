@@ -45,6 +45,12 @@ select
 from
   following;
 
+-- name: ListAllFollowers :many
+select
+  *
+from
+  follower;
+
 -- name: GetLastSession :many
 select
   *
@@ -59,4 +65,15 @@ where
 order by
   "lastSeen" desc
 limit
-  1
+  1;
+
+-- name: ListFollowerLastRecordedBefore :many
+select
+  following,
+  followed_by,
+  last_recorded
+from
+  follower
+where
+  following = ?
+  and last_recorded < ?;

@@ -22,10 +22,12 @@ import (
 type AllFollowing struct {
 	database *database.Database
 	client   *xrpc.Client
+	publicClient   *xrpc.Client
 
 	userDids         sync.Map
 	followingRecords sync.Map
 	followedBy       sync.Map
+	followers        sync.Map
 
 	batchMutex *sync.Mutex
 }
@@ -34,10 +36,11 @@ var emptyFollowedBy []string
 
 const purgePageSize = 10000;
 
-func NewAllFollowing(database *database.Database, client *xrpc.Client, batchMutex *sync.Mutex) *AllFollowing {
+func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client, batchMutex *sync.Mutex) *AllFollowing {
 	allFollowing := &AllFollowing{
 		database: database,
 		client:   client,
+		publicClient: publicClient,
 		batchMutex: batchMutex,
 	}
 
@@ -120,6 +123,39 @@ func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following
 	return record, loaded
 }
 
+func (allFollowing *AllFollowing) addFollowerData(record schema.Follower) {
+	for {
+		current, _ := allFollowing.followers.LoadOrStore(record.Following, &emptyFollowedBy)
+		updated := append(slices.Clone(*current.(*[]string)), record.FollowedBy)
+		swapped := allFollowing.followers.CompareAndSwap(record.Following, current, &updated)
+		if swapped {
+			break
+		}
+	}
+}
+
+func (allFollowing *AllFollowing) removeFollowerData(following string, followedBy string) {
+	for {
+		current, _ := allFollowing.followers.Load(following)
+		if current == nil {
+			break
+		}
+		newVal := slices.Clone(*current.(*[]string))
+		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == followedBy})
+		if len(newVal) > 0 {
+			swapped := allFollowing.followers.CompareAndSwap(following, current, &newVal)
+			if swapped {
+				break
+			}
+		} else {
+			deleted := allFollowing.followers.CompareAndDelete(following, current)
+			if deleted {
+				break
+			}
+		}
+	}
+}
+
 func (allFollowing *AllFollowing) Hydrate(ctx context.Context) {
 	userDids, err := allFollowing.database.Queries.ListAllUsers(ctx)
 	if err != nil {
@@ -135,6 +171,14 @@ func (allFollowing *AllFollowing) Hydrate(ctx context.Context) {
 	}
 	for _, followingRecord := range followingRecords {
 		allFollowing.addFollowData(followingRecord)
+	}
+
+	followerRecords, err := allFollowing.database.Queries.ListAllFollowers(ctx)
+	if err != nil {
+		panic(err)
+	}
+	for _, followerRecord := range followerRecords {
+		allFollowing.addFollowerData(followerRecord)
 	}
 }
 
@@ -187,6 +231,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 	}
 	allFollowing.userDids.Store(user.UserDid, true)
 
+	syncStart := time.Now().UTC().Format(time.RFC3339)
 	follows := make([]schema.Following, 0, 100)
 	followedFromSync := make(map[string]bool)
 	for cursor := ""; ; {
@@ -228,8 +273,10 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 
 	followers := make([]schema.Follower, 0, 100)
 	followersFromSync := make(map[string]bool)
+
 	for cursor := ""; ; {
-		followersResult, err := bsky.GraphGetFollowers(ctx, allFollowing.client, user.UserDid, cursor, 100)
+		lastRecorded := time.Now().UTC().Format(time.RFC3339)
+		followersResult, err := bsky.GraphGetFollowers(ctx, allFollowing.publicClient, user.UserDid, cursor, 100)
 		if err != nil {
 			return err
 		}
@@ -239,6 +286,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 			followers[i] = schema.Follower{
 				Following:            user.UserDid,
 				FollowedBy:           record.Did,
+				LastRecorded: lastRecorded,
 			}
 			followersFromSync[followers[i].FollowedBy] = true
 		}
@@ -251,6 +299,10 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 			break
 		}
 		cursor = *followersResult.Cursor
+	}
+	err := allFollowing.removeFollowersNotRecordedAfter(ctx, user.UserDid, syncStart)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -288,6 +340,7 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
 			FollowedBy: record.FollowedBy,
 			Following: record.Following,
+			LastRecorded: record.LastRecorded,
 		}); err != nil {
 			return err
 		}
@@ -309,6 +362,35 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 	err = tx.Commit()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (allFollowing *AllFollowing) removeFollowersNotRecordedAfter(ctx context.Context, userDid string, before string) error {
+	followersToRemove, err := allFollowing.database.Queries.ListFollowerLastRecordedBefore(ctx, schema.ListFollowerLastRecordedBeforeParams{
+		Following: userDid,
+		LastRecorded: before,
+	})
+	if err != nil {
+		return err;
+	}
+	
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, follower := range followersToRemove {
+		err := updates.DeleteFollower(ctx, writeSchema.DeleteFollowerParams{
+			Following: follower.Following,
+			FollowedBy: follower.FollowedBy,
+			LastRecorded:  before,
+		})
+		allFollowing.removeFollowerData(follower.Following, follower.FollowedBy)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

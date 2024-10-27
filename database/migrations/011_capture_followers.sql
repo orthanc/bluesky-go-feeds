@@ -3,7 +3,7 @@ create table follower (
   followed_by varchar not null,
   following varchar not null,
   mutual numeric default 0,
-  lastUpdated varchar not null,
+  last_recorded varchar not null,
   primary key (followed_by, following),
   constraint fk_follower_user foreign key (following) references user (userDid) on delete cascade
 );
@@ -32,7 +32,7 @@ end;
 -- +goose StatementBegin
 create trigger follower_on_delete AFTER delete on follower for each row begin
   update following set mutual = mutual - 1
-  where following = new.followed_by AND followedBy = new.following;
+  where following = old.followed_by AND followedBy = old.following;
 end;
 -- +goose StatementEnd
 
@@ -47,7 +47,7 @@ create trigger following_on_insert AFTER insert on following for each row begin
 
   update following set mutual = (
     select count(*) from follower where following = new.followedBy AND followed_by = new.following
-  ) where followed_by = new.followed_by AND following = new.following;
+  ) where followedBy = new.followedBy AND following = new.following;
 end;
 -- +goose StatementEnd
 
@@ -58,7 +58,7 @@ create trigger following_on_delete AFTER delete on following for each row begin
   where author = old.following AND user = old.followedBy;
 
   update follower set mutual = mutual - 1
-  where following = new.followedBy AND followed_by = new.following;
+  where following = old.followedBy AND followed_by = old.following;
 end;
 -- +goose StatementEnd
 
