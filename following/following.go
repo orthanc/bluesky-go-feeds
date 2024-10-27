@@ -290,7 +290,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		if err != nil {
 			return err
 		}
-		fmt.Println("Saved Page")
+		fmt.Printf("Saved following page for %s\n", userDid)
 		if followResult.Cursor == nil {
 			break
 		}
@@ -324,7 +324,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		if err != nil {
 			return err
 		}
-		fmt.Println("Saved Page")
+		fmt.Printf("Saved follower page for %s\n", userDid)
 		if followersResult.Cursor == nil {
 			break
 		}
