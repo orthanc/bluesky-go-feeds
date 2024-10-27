@@ -28,7 +28,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event subscriptio
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
 		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
 		authorIsFollowed := len(authorFollowedBy) > 0
-		if !(processor.AllFollowing.IsFollowed(postAuthor) ||
+		if !(processor.AllFollowing.IsAuthor(postAuthor) ||
 			authorIsFollowed) {
 			return nil
 		}
@@ -39,7 +39,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event subscriptio
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if processor.AllFollowing.IsFollowed(postAuthor) {
+		if processor.AllFollowing.IsAuthor(postAuthor) {
 			err := updates.IncrementPostRepost(ctx, postUri)
 			if err != nil {
 				return err

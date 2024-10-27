@@ -29,7 +29,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
 		authorIsFollowed := len(authorFollowedBy) > 0
 		if !(processor.AllFollowing.IsUser(postAuthor) ||
-			processor.AllFollowing.IsFollowed(postAuthor) ||
+			processor.AllFollowing.IsAuthor(postAuthor) ||
 			authorIsFollowed) {
 			return nil
 		}
@@ -40,7 +40,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if processor.AllFollowing.IsFollowed(postAuthor) {
+		if processor.AllFollowing.IsAuthor(postAuthor) {
 			err := updates.IncrementPostLike(ctx, postUri)
 			if err != nil {
 				return err
