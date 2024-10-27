@@ -329,6 +329,16 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 	return nil
 }
 
+func (allFollowing *AllFollowing) RecordFollower(ctx context.Context, uri string, following string, followedBy string) error {
+	record := schema.Follower{
+		Following:     following,
+		FollowedBy:    followedBy,
+		LastRecorded:  time.Now().UTC().Format(time.RFC3339),
+	}
+
+	return allFollowing.saveFollowerPage(ctx, []schema.Follower{record})
+}
+
 func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records []schema.Follower) error {
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
 	if err != nil {
