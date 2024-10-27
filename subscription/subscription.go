@@ -104,7 +104,7 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 					}
 					err = listener(ctx, event)
 					if err != nil {
-						fmt.Printf("Unable to process %s: %s", collection, err)
+						fmt.Printf("Unable to process %s: %s\n", collection, err)
 						continue
 					}
 				}

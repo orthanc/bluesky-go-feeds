@@ -123,14 +123,14 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	if limitParam != "" {
 		parsedLimit, err := strconv.Atoi(limitParam)
 		if err != nil {
-			fmt.Printf("invalid limit %s: %s", limitParam, err)
+			fmt.Printf("invalid limit %s: %s\n", limitParam, err)
 			w.WriteHeader(400)
 		}
 		limit = parsedLimit
 	}
 	result, err := alg(ctx, *handler.database, lastSession, cursor, limit)
 	if err != nil {
-		fmt.Printf("Error calling %s for %s: %s", feedUri, userDid, err)
+		fmt.Printf("Error calling %s for %s: %s\n", feedUri, userDid, err)
 		w.WriteHeader(500)
 		return
 	}
