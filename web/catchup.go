@@ -11,9 +11,9 @@ import (
 )
 
 type catchupQueryRow = struct {
-	Uri string
-  IndexedAt string
-  Rating float64
+	Uri       string
+	IndexedAt string
+	Rating    float64
 }
 
 const catchupAlgorithmId = "catchup"
@@ -43,8 +43,8 @@ offset
 
 func catchup(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
 	output := bsky.FeedGetFeedSkeleton_Output{
-    Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
-  }
+		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
+	}
 	offset := 0
 	if cursor != "" {
 		parsedOffset, err := strconv.Atoi(cursor)

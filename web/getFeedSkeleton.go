@@ -19,12 +19,12 @@ import (
 
 type GetFeedSkeletonHandler struct {
 	following *following.AllFollowing
-	database *database.Database
+	database  *database.Database
 }
 
 func NewGetFeedSkeleton(database *database.Database, following *following.AllFollowing) http.Handler {
 	return GetFeedSkeletonHandler{
-		database: database,
+		database:  database,
 		following: following,
 	}
 }
@@ -51,7 +51,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	ctx := context.Background()
 	lastSessionResult, err := handler.database.Queries.GetLastSession(ctx, schema.GetLastSessionParams{
 		UserDid: userDid,
-		Algo: database.ToNullString(algKey),
+		Algo:    database.ToNullString(algKey),
 	})
 	if err != nil {
 		fmt.Println(err)
@@ -61,9 +61,9 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	lastSeen := time.Now().UTC().Format(time.RFC3339)
 
 	var lastSession schema.Session
-	if len(lastSessionResult) == 0 || lastSessionResult[0].LastSeen < time.Now().UTC().Add(time.Duration(-1) * time.Hour).Format(time.RFC3339) {
+	if len(lastSessionResult) == 0 || lastSessionResult[0].LastSeen < time.Now().UTC().Add(time.Duration(-1)*time.Hour).Format(time.RFC3339) {
 		updated, err := handler.database.Updates.UpdateUserLastSeen(ctx, writeSchema.UpdateUserLastSeenParams{
-			UserDid: userDid,
+			UserDid:  userDid,
 			LastSeen: lastSeen,
 		})
 		if err != nil {
@@ -71,7 +71,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			w.WriteHeader(500)
 			return
 		}
-		if len(updated) == 0 || !updated[0].LastSynced.Valid || updated[0].LastSynced.String < time.Now().UTC().Add(time.Duration(-24) * time.Hour).Format(time.RFC3339) {
+		if len(updated) == 0 || !updated[0].LastSynced.Valid || updated[0].LastSynced.String < time.Now().UTC().Add(time.Duration(-24)*time.Hour).Format(time.RFC3339) {
 			go func() {
 				err := handler.following.SyncFollowing(context.Background(), userDid, lastSeen)
 				if err != nil {
@@ -84,20 +84,20 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			postsSince = lastSessionResult[0].StartedAt
 		}
 		lastSession = schema.Session{
-			UserDid: userDid,
-			StartedAt: lastSeen,
-			LastSeen: lastSeen,
-			PostsSince: postsSince,
+			UserDid:     userDid,
+			StartedAt:   lastSeen,
+			LastSeen:    lastSeen,
+			PostsSince:  postsSince,
 			AccessCount: sql.NullFloat64{Float64: 0, Valid: true},
-			Algo: database.ToNullString(algKey),
+			Algo:        database.ToNullString(algKey),
 		}
 		err = handler.database.Updates.SaveSession(ctx, writeSchema.SaveSessionParams{
-			UserDid: lastSession.UserDid,
-			StartedAt: lastSession.StartedAt,
-			LastSeen: lastSession.LastSeen,
-			PostsSince: lastSession.PostsSince,
+			UserDid:     lastSession.UserDid,
+			StartedAt:   lastSession.StartedAt,
+			LastSeen:    lastSession.LastSeen,
+			PostsSince:  lastSession.PostsSince,
 			AccessCount: lastSession.AccessCount,
-			Algo: lastSession.Algo,
+			Algo:        lastSession.Algo,
 		})
 		if err != nil {
 			fmt.Println(err)
@@ -108,7 +108,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		lastSession = lastSessionResult[0]
 		err := handler.database.Updates.UpdateSessionLastSeen(ctx, writeSchema.UpdateSessionLastSeenParams{
 			SessionId: lastSession.SessionId,
-			LastSeen: lastSeen,
+			LastSeen:  lastSeen,
 		})
 		if err != nil {
 			fmt.Println(err)

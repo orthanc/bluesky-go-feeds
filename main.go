@@ -21,8 +21,8 @@ import (
 
 func main() {
 	ctx := context.Background()
-	dbDown := flag.Bool("db-down", false, "migrate the database down one revision then exit");
-	dbUp := flag.Bool("db-up", false, "migrate the database up to the latest revision then exit");
+	dbDown := flag.Bool("db-down", false, "migrate the database down one revision then exit")
+	dbUp := flag.Bool("db-up", false, "migrate the database up to the latest revision then exit")
 	flag.Parse()
 
 	database, err := database.NewDatabase(ctx)

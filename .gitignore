@@ -1,0 +1,7 @@
+.env
+feed-data.db
+feed-data.db-shm
+feed-data.db-wal
+feed-data.db.tmp-shm
+feed-data.db.tmp-wal
+feedgenerator

@@ -11,13 +11,13 @@ import (
 )
 
 type loveliesQueryRow = struct {
-	Uri string
-  IndexedAt string
-  Author string
-  UserInteractionRatio float64
-  IScore float64
-  TScore float64
-  Rating float64
+	Uri                  string
+	IndexedAt            string
+	Author               string
+	UserInteractionRatio float64
+	IScore               float64
+	TScore               float64
+	Rating               float64
 }
 
 const loveliesAlgorithmId = "o1s6niihick9"
@@ -64,8 +64,8 @@ offset
 
 func lovelies(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
 	output := bsky.FeedGetFeedSkeleton_Output{
-    Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
-  }
+		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
+	}
 	offset := 0
 	if cursor != "" {
 		parsedOffset, err := strconv.Atoi(cursor)

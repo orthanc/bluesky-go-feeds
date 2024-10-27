@@ -77,9 +77,9 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 
 		for _, followedBy := range authorFollowedBy {
 			err := updates.SavePostLikedByFollowing(ctx, writeSchema.SavePostLikedByFollowingParams{
-				User: followedBy,
-				Uri: postUri,
-				Author: postAuthor,
+				User:      followedBy,
+				Uri:       postUri,
+				Author:    postAuthor,
 				IndexedAt: indexedAt,
 			})
 			if err != nil {

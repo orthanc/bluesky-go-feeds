@@ -20,9 +20,9 @@ import (
 )
 
 type AllFollowing struct {
-	database *database.Database
-	client   *xrpc.Client
-	publicClient   *xrpc.Client
+	database     *database.Database
+	client       *xrpc.Client
+	publicClient *xrpc.Client
 
 	userDids         sync.Map
 	followingRecords sync.Map
@@ -34,14 +34,14 @@ type AllFollowing struct {
 
 var emptyFollowedBy []string
 
-const purgePageSize = 10000;
+const purgePageSize = 10000
 
 func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client, batchMutex *sync.Mutex) *AllFollowing {
 	allFollowing := &AllFollowing{
-		database: database,
-		client:   client,
+		database:     database,
+		client:       client,
 		publicClient: publicClient,
-		batchMutex: batchMutex,
+		batchMutex:   batchMutex,
 	}
 
 	ctx := context.Background()
@@ -116,7 +116,7 @@ func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following
 			break
 		}
 		newVal := slices.Clone(*current.(*[]string))
-		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == record.FollowedBy})
+		newVal = slices.DeleteFunc(newVal, func(e string) bool { return e == record.FollowedBy })
 		if len(newVal) > 0 {
 			swapped := allFollowing.followedBy.CompareAndSwap(record.Following, current, &newVal)
 			if swapped {
@@ -150,7 +150,7 @@ func (allFollowing *AllFollowing) removeFollowerData(following string, followedB
 			return false
 		}
 		newVal := slices.Clone(*current.(*[]string))
-		newVal = slices.DeleteFunc(newVal, func (e string) bool {return e == following})
+		newVal = slices.DeleteFunc(newVal, func(e string) bool { return e == following })
 		if len(newVal) > 0 {
 			swapped := allFollowing.followers.CompareAndSwap(followedBy, current, &newVal)
 			if swapped {
@@ -200,11 +200,11 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 
 	for _, record := range records {
 		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams{
-			Uri: record.Uri,
-			FollowedBy: record.FollowedBy,
-			Following: record.Following,
+			Uri:                  record.Uri,
+			FollowedBy:           record.FollowedBy,
+			Following:            record.Following,
 			UserInteractionRatio: record.UserInteractionRatio,
-			LastRecorded: record.LastRecorded,
+			LastRecorded:         record.LastRecorded,
 		}); err != nil {
 			return err
 		}
@@ -232,13 +232,13 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 
 func (allFollowing *AllFollowing) removeFollowingNotRecordedAfter(ctx context.Context, userDid string, before string) error {
 	followingToRemove, err := allFollowing.database.Queries.ListFollowingLastRecordedBefore(ctx, schema.ListFollowingLastRecordedBeforeParams{
-		FollowedBy: userDid,
+		FollowedBy:   userDid,
 		LastRecorded: database.ToNullString(before),
 	})
 	if err != nil {
-		return err;
+		return err
 	}
-	
+
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
 	if err != nil {
 		return err
@@ -258,8 +258,8 @@ func (allFollowing *AllFollowing) removeFollowingNotRecordedAfter(ctx context.Co
 
 func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid string, lastSeen string) error {
 	user := writeSchema.SaveUserParams{
-		UserDid:  userDid,
-		LastSeen: lastSeen,
+		UserDid:    userDid,
+		LastSeen:   lastSeen,
 		LastSynced: database.ToNullString(time.Now().UTC().Format(time.RFC3339)),
 	}
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
@@ -301,7 +301,6 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		return err
 	}
 
-
 	followers := make([]schema.Follower, 0, 100)
 	followersFromSync := make(map[string]bool)
 
@@ -315,8 +314,8 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		followers = followers[:len(followersResult.Followers)]
 		for i, record := range followersResult.Followers {
 			followers[i] = schema.Follower{
-				Following:            user.UserDid,
-				FollowedBy:           record.Did,
+				Following:    user.UserDid,
+				FollowedBy:   record.Did,
 				LastRecorded: lastRecorded,
 			}
 			followersFromSync[followers[i].FollowedBy] = true
@@ -344,7 +343,7 @@ func (allFollowing *AllFollowing) RecordFollow(ctx context.Context, uri string, 
 		Following:            following,
 		FollowedBy:           followedBy,
 		UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
-		LastRecorded: 				database.ToNullString(time.Now().UTC().Format(time.RFC3339)),
+		LastRecorded:         database.ToNullString(time.Now().UTC().Format(time.RFC3339)),
 	}
 
 	return allFollowing.saveFollowingPage(ctx, []schema.Following{record})
@@ -363,9 +362,9 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 
 func (allFollowing *AllFollowing) RecordFollower(ctx context.Context, uri string, following string, followedBy string) error {
 	record := schema.Follower{
-		Following:     following,
-		FollowedBy:    followedBy,
-		LastRecorded:  time.Now().UTC().Format(time.RFC3339),
+		Following:    following,
+		FollowedBy:   followedBy,
+		LastRecorded: time.Now().UTC().Format(time.RFC3339),
 	}
 
 	return allFollowing.saveFollowerPage(ctx, []schema.Follower{record})
@@ -380,8 +379,8 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 
 	for _, record := range records {
 		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
-			FollowedBy: record.FollowedBy,
-			Following: record.Following,
+			FollowedBy:   record.FollowedBy,
+			Following:    record.Following,
 			LastRecorded: record.LastRecorded,
 		}); err != nil {
 			return err
@@ -410,13 +409,13 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 
 func (allFollowing *AllFollowing) removeFollowersNotRecordedAfter(ctx context.Context, userDid string, before string) error {
 	followersToRemove, err := allFollowing.database.Queries.ListFollowerLastRecordedBefore(ctx, schema.ListFollowerLastRecordedBeforeParams{
-		Following: userDid,
+		Following:    userDid,
 		LastRecorded: before,
 	})
 	if err != nil {
-		return err;
+		return err
 	}
-	
+
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
 	if err != nil {
 		return err
@@ -425,9 +424,9 @@ func (allFollowing *AllFollowing) removeFollowersNotRecordedAfter(ctx context.Co
 
 	for _, follower := range followersToRemove {
 		err := updates.DeleteFollower(ctx, writeSchema.DeleteFollowerParams{
-			Following: follower.Following,
-			FollowedBy: follower.FollowedBy,
-			LastRecorded:  before,
+			Following:    follower.Following,
+			FollowedBy:   follower.FollowedBy,
+			LastRecorded: before,
 		})
 		if err != nil {
 			return err
@@ -458,7 +457,7 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 
 	allFollowing.userDids.Delete(userDid)
 	var authorsToDelete []string
-	allFollowing.followingRecords.Range(func (key any, value any) bool {
+	allFollowing.followingRecords.Range(func(key any, value any) bool {
 		following := value.(schema.Following)
 		if following.FollowedBy == userDid {
 			allFollowing.removeFollowData(following.Uri)
@@ -468,7 +467,7 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 		}
 		return true
 	})
-	allFollowing.followers.Range(func (key any, value any) bool {
+	allFollowing.followers.Range(func(key any, value any) bool {
 		followedBy := key.(string)
 		removed := allFollowing.removeFollowerData(userDid, followedBy)
 		if removed && !allFollowing.IsAuthor(followedBy) {
@@ -477,7 +476,7 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 		return true
 	})
 	for start := 0; start < len(authorsToDelete); {
-		end := min(start + 1000, len(authorsToDelete))
+		end := min(start+1000, len(authorsToDelete))
 		batch := authorsToDelete[start:end]
 		if _, err := updates.DeleteAuthorsByDid(ctx, batch); err != nil {
 			return fmt.Errorf("error deleting authors now unused by user %s: %w", userDid, err)
@@ -490,7 +489,7 @@ func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string,
 	return nil
 }
 
-func pagedPurge(messageTemplate string, deletePage func () (int64, error)) (int64, error) {
+func pagedPurge(messageTemplate string, deletePage func() (int64, error)) (int64, error) {
 	var count int64 = 0
 	var pages int64 = 0
 	for {
@@ -501,11 +500,11 @@ func pagedPurge(messageTemplate string, deletePage func () (int64, error)) (int6
 		count += rows
 		pages++
 		if rows < purgePageSize {
-			fmt.Printf(messageTemplate + " in %d pages\n", count, pages)
+			fmt.Printf(messageTemplate+" in %d pages\n", count, pages)
 			return count, nil
 		}
-		if pages % 10 == 0 {
-			fmt.Printf(messageTemplate + " page %d\n", count, pages)
+		if pages%10 == 0 {
+			fmt.Printf(messageTemplate+" page %d\n", count, pages)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
@@ -521,7 +520,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err := pagedPurge("Deleted %d posts", func() (int64, error) {
 		return updates.DeletePostsBefore(ctx, writeSchema.DeletePostsBeforeParams{
 			IndexedAt: purgeBefore,
-			Limit: purgePageSize,
+			Limit:     purgePageSize,
 		})
 	})
 	if err != nil {
@@ -531,7 +530,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err = pagedPurge("Deleted %d reposts", func() (int64, error) {
 		return updates.DeleteRepostsBefore(ctx, writeSchema.DeleteRepostsBeforeParams{
 			IndexedAt: purgeBefore,
-			Limit: purgePageSize,
+			Limit:     purgePageSize,
 		})
 	})
 	if err != nil {
@@ -541,7 +540,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err = pagedPurge("Deleted %d sessions", func() (int64, error) {
 		return updates.DeleteSessionsBefore(ctx, writeSchema.DeleteSessionsBeforeParams{
 			LastSeen: purgeBefore,
-			Limit: purgePageSize,
+			Limit:    purgePageSize,
 		})
 	})
 	if err != nil {
@@ -551,7 +550,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err = pagedPurge("Deleted %d user interactions", func() (int64, error) {
 		return updates.DeleteUserInteractionsBefore(ctx, writeSchema.DeleteUserInteractionsBeforeParams{
 			IndexedAt: purgeBefore,
-			Limit: purgePageSize,
+			Limit:     purgePageSize,
 		})
 	})
 	if err != nil {
@@ -561,7 +560,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err = pagedPurge("Deleted %d interactions with user", func() (int64, error) {
 		return updates.DeleteInteractionWithUsersBefore(ctx, writeSchema.DeleteInteractionWithUsersBeforeParams{
 			IndexedAt: purgeBefore,
-			Limit: purgePageSize,
+			Limit:     purgePageSize,
 		})
 	})
 	if err != nil {
@@ -571,7 +570,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	_, err = pagedPurge("Deleted %d interactions by followed", func() (int64, error) {
 		return updates.DeletePostInteractedByFollowedBefore(ctx, writeSchema.DeletePostInteractedByFollowedBeforeParams{
 			IndexedAt: purgeBefore,
-			Limit: purgePageSize,
+			Limit:     purgePageSize,
 		})
 	})
 	if err != nil {

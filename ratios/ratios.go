@@ -11,30 +11,30 @@ import (
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
 )
 
-
 type Ratios struct {
-	database *database.Database
+	database   *database.Database
 	batchMutex *sync.Mutex
 }
 
 func NewRatios(database *database.Database, batchMutex *sync.Mutex) *Ratios {
 	ratios := &Ratios{
-		database: database,
+		database:   database,
 		batchMutex: batchMutex,
 	}
 	ctx := context.Background()
-	
+
 	ticker := time.NewTicker(6 * time.Hour)
-	go func () {
+	go func() {
 		err := ratios.UpdateAllRatios(ctx)
 		if err != nil {
-			fmt.Printf("Error updating ratios: %s\n",  err)
+			fmt.Printf("Error updating ratios: %s\n", err)
 		}
 		for range ticker.C {
 			err := ratios.UpdateAllRatios(ctx)
 			if err != nil {
-				fmt.Printf("Error updating ratios: %s\n",  err)
-			}}
+				fmt.Printf("Error updating ratios: %s\n", err)
+			}
+		}
 	}()
 
 	return ratios
@@ -61,7 +61,6 @@ update "following" set "userInteractionRatio" = (
 var updatePostCountsSql string = `
 update "author" set "postCount" = (select count(*) from "post" where "post"."author" = "author"."did")
 `
-
 
 // async updateAllMedians() {
 // 	const authors = await this.db.selectFrom('author').select(['did']).execute();
@@ -92,7 +91,7 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if ind % 1000 == 0 {
+		if ind%1000 == 0 {
 			fmt.Printf("Updated %d author medians\n", ind)
 			time.Sleep(250 * time.Millisecond)
 		}
@@ -141,10 +140,10 @@ func (ratios *Ratios) UpdateAllMediansForAuthor(ctx context.Context, authorDid s
 	err = ratios.database.Updates.UpdateAuthorMedians(ctx, writeSchema.UpdateAuthorMediansParams{
 		MedianDirectReplyCount: median(directReplyCounts, 0),
 		MedianInteractionCount: median(interactionCounts, 0),
-		MedianLikeCount: median(likeCounts, 0),
-		MedianReplyCount: median(replyCounts, 0),
+		MedianLikeCount:        median(likeCounts, 0),
+		MedianReplyCount:       median(replyCounts, 0),
 	})
-	return err;
+	return err
 }
 
 func median(data []float64, def float64) float64 {
@@ -152,5 +151,5 @@ func median(data []float64, def float64) float64 {
 		return def
 	}
 	slices.Sort(data)
-	return data[len(data) / 2]
+	return data[len(data)/2]
 }

@@ -67,12 +67,12 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			if err != nil {
 				return err
 			}
-			if (replyParent != "") {
+			if replyParent != "" {
 				for _, followedBy := range authorFollowedBy {
 					err := updates.SavePostDirectRepliedToByFollowing(ctx, writeSchema.SavePostDirectRepliedToByFollowingParams{
-						User: followedBy,
-						Uri: replyParent,
-						Author: replyParentAuthor,
+						User:      followedBy,
+						Uri:       replyParent,
+						Author:    replyParentAuthor,
 						IndexedAt: indexedAt,
 					})
 					if err != nil {
@@ -83,9 +83,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			if replyRoot != replyParent {
 				for _, followedBy := range authorFollowedBy {
 					err := updates.SavePostRepliedToByFollowing(ctx, writeSchema.SavePostRepliedToByFollowingParams{
-						User: followedBy,
-						Uri: replyRoot,
-						Author: replyRootAuthor,
+						User:      followedBy,
+						Uri:       replyRoot,
+						Author:    replyRootAuthor,
 						IndexedAt: indexedAt,
 					})
 					if err != nil {

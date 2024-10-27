@@ -17,7 +17,7 @@ type FollowProcessor struct {
 func (processor *FollowProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
 	switch event.EventKind {
 	case repomgr.EvtKindCreateRecord:
-		subject := event.Record["subject"].(string);
+		subject := event.Record["subject"].(string)
 		if processor.AllFollowing.IsUser(event.Author) {
 			err := processor.AllFollowing.RecordFollow(ctx, event.Uri, event.Author, subject)
 			if err != nil {

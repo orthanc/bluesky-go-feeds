@@ -73,12 +73,12 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 	var lastEvtTime int64 = 0
 	var lastSeq int64 = 0
 	ctx, cancel := context.WithCancel(initialCtx)
-	go func () {
+	go func() {
 		ticker := time.NewTicker(time.Minute)
 		for range ticker.C {
 			now := time.Now().UTC()
 			windowOpenFor := time.Duration((now.UnixMilli() - windowStart) * time.Hour.Milliseconds())
-			if windowOpenFor > time.Duration(5 * time.Minute) {
+			if windowOpenFor > time.Duration(5*time.Minute) {
 				log.Printf("No traffic for %s, killing connection\n", windowOpenFor)
 				oldCancel := cancel
 				// Reset the context so that its not cancelled for the retry
@@ -114,7 +114,7 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
 					Service: service,
 					Cursor:  evt.Seq,
-				})	
+				})
 				windowEnd := time.Now().UTC().UnixMilli()
 				timeSpent := windowEnd - windowStart
 				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
@@ -123,16 +123,16 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 				lagTime := windowEnd - evtTime
 				toCatchUp := time.Duration(0)
 				if lagTime > caughtUp {
-					toCatchUp = time.Duration(timeSpent * lagTime / caughtUp) * time.Millisecond
+					toCatchUp = time.Duration(timeSpent*lagTime/caughtUp) * time.Millisecond
 				}
 				fmt.Printf(
 					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up) %d seq\n",
 					eventCountSinceSync,
-					time.Duration(timeSpent) * time.Millisecond,
-					1000.0 * float64(eventCountSinceSync) / float64(timeSpent),
+					time.Duration(timeSpent)*time.Millisecond,
+					1000.0*float64(eventCountSinceSync)/float64(timeSpent),
 					evt.Time,
-					time.Duration(caughtUp) * time.Millisecond,
-					time.Duration(lagTime) * time.Millisecond,
+					time.Duration(caughtUp)*time.Millisecond,
+					time.Duration(lagTime)*time.Millisecond,
 					toCatchUp,
 					evt.Seq,
 				)
@@ -153,7 +153,7 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 	for {
 		queryString := ""
 		if lastSeq != 0 {
-				queryString = fmt.Sprintf("?cursor=%d", lastSeq)
+			queryString = fmt.Sprintf("?cursor=%d", lastSeq)
 		}
 		dialer := websocket.DefaultDialer
 		uri := fmt.Sprintf("%s/xrpc/com.atproto.sync.subscribeRepos%s", service, queryString)
