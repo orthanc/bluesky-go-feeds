@@ -389,10 +389,14 @@ insert into
     "uri",
     "followedBy",
     "following",
-    "userInteractionRatio"
+    "userInteractionRatio",
+    last_recorded
   )
 values
-  (?, ?, ?, ?) on conflict do nothing
+  (?, ?, ?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded
 `
 
 type SaveFollowingParams struct {
@@ -400,6 +404,7 @@ type SaveFollowingParams struct {
 	FollowedBy           string
 	Following            string
 	UserInteractionRatio sql.NullFloat64
+	LastRecorded         sql.NullString
 }
 
 func (q *Queries) SaveFollowing(ctx context.Context, arg SaveFollowingParams) error {
@@ -408,6 +413,7 @@ func (q *Queries) SaveFollowing(ctx context.Context, arg SaveFollowingParams) er
 		arg.FollowedBy,
 		arg.Following,
 		arg.UserInteractionRatio,
+		arg.LastRecorded,
 	)
 	return err
 }

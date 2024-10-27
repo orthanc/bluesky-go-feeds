@@ -218,10 +218,14 @@ insert into
     "uri",
     "followedBy",
     "following",
-    "userInteractionRatio"
+    "userInteractionRatio",
+    last_recorded
   )
 values
-  (?, ?, ?, ?) on conflict do nothing;
+  (?, ?, ?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded;
 
 -- name: DeleteFollowing :exec
 delete from following

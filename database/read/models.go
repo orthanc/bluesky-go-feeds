@@ -39,6 +39,7 @@ type Following struct {
 	Following            string
 	UserInteractionRatio sql.NullFloat64
 	Mutual               sql.NullFloat64
+	LastRecorded         sql.NullString
 }
 
 type InteractionWithUser struct {

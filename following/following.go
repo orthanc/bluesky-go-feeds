@@ -204,6 +204,7 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 			FollowedBy: record.FollowedBy,
 			Following: record.Following,
 			UserInteractionRatio: record.UserInteractionRatio,
+			LastRecorded: record.LastRecorded,
 		}); err != nil {
 			return err
 		}
@@ -229,6 +230,32 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 	return nil
 }
 
+func (allFollowing *AllFollowing) removeFollowingNotRecordedAfter(ctx context.Context, userDid string, before string) error {
+	followingToRemove, err := allFollowing.database.Queries.ListFollowingLastRecordedBefore(ctx, schema.ListFollowingLastRecordedBeforeParams{
+		FollowedBy: userDid,
+		LastRecorded: database.ToNullString(before),
+	})
+	if err != nil {
+		return err;
+	}
+	
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, following := range followingToRemove {
+		err := updates.DeleteFollowing(ctx, following.Uri)
+		if err != nil {
+			return err
+		}
+		allFollowing.removeFollowData(following.Uri)
+	}
+	tx.Commit()
+	return nil
+}
+
 func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid string, lastSeen string) error {
 	user := writeSchema.SaveUserParams{
 		UserDid:  userDid,
@@ -242,8 +269,8 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 
 	syncStart := time.Now().UTC().Format(time.RFC3339)
 	follows := make([]schema.Following, 0, 100)
-	followedFromSync := make(map[string]bool)
 	for cursor := ""; ; {
+		lastRecorded := time.Now().UTC().Format(time.RFC3339)
 		followResult, err := atproto.RepoListRecords(ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, user.UserDid, false, "", "")
 		if err != nil {
 			return err
@@ -256,8 +283,8 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 				Following:            record.Value.Val.(*bsky.GraphFollow).Subject,
 				FollowedBy:           user.UserDid,
 				UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
+				LastRecorded:         database.ToNullString(lastRecorded),
 			}
-			followedFromSync[follows[i].Following] = true
 		}
 		err = allFollowing.saveFollowingPage(ctx, follows)
 		if err != nil {
@@ -269,15 +296,10 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		}
 		cursor = *followResult.Cursor
 	}
-	allFollowing.followingRecords.Range(func (key any, value any) bool {
-		following := value.(schema.Following)
-		if following.FollowedBy == userDid && !followedFromSync[following.Following] {
-			if err := allFollowing.RemoveFollow(ctx, following.Uri); err != nil {
-				fmt.Printf("Error removing orphaned follow %s %s => %s: %s", following.Uri, following.FollowedBy, following.Following, err)
-			}
-		}
-		return true
-	})
+	err := allFollowing.removeFollowingNotRecordedAfter(ctx, user.UserDid, syncStart)
+	if err != nil {
+		return err
+	}
 
 
 	followers := make([]schema.Follower, 0, 100)
@@ -309,7 +331,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		}
 		cursor = *followersResult.Cursor
 	}
-	err := allFollowing.removeFollowersNotRecordedAfter(ctx, user.UserDid, syncStart)
+	err = allFollowing.removeFollowersNotRecordedAfter(ctx, user.UserDid, syncStart)
 	if err != nil {
 		return err
 	}
@@ -322,6 +344,7 @@ func (allFollowing *AllFollowing) RecordFollow(ctx context.Context, uri string, 
 		Following:            following,
 		FollowedBy:           followedBy,
 		UserInteractionRatio: sql.NullFloat64{Float64: 0.1, Valid: true},
+		LastRecorded: 				database.ToNullString(time.Now().UTC().Format(time.RFC3339)),
 	}
 
 	return allFollowing.saveFollowingPage(ctx, []schema.Following{record})
@@ -406,11 +429,12 @@ func (allFollowing *AllFollowing) removeFollowersNotRecordedAfter(ctx context.Co
 			FollowedBy: follower.FollowedBy,
 			LastRecorded:  before,
 		})
-		allFollowing.removeFollowerData(follower.Following, follower.FollowedBy)
 		if err != nil {
 			return err
 		}
+		allFollowing.removeFollowerData(follower.Following, follower.FollowedBy)
 	}
+	tx.Commit()
 	return nil
 }
 

@@ -77,3 +77,16 @@ from
 where
   following = ?
   and last_recorded < ?;
+
+-- name: ListFollowingLastRecordedBefore :many
+select
+  uri,
+  last_recorded
+from
+  following
+where
+  "followedBy" = ?
+  and (
+    last_recorded is NULL
+    or last_recorded < ?
+  );

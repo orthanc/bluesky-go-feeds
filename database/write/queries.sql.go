@@ -164,7 +164,7 @@ func (q *Queries) ListAllFollowers(ctx context.Context) ([]Follower, error) {
 
 const listAllFollowing = `-- name: ListAllFollowing :many
 select
-  uri, followedBy, "following", userInteractionRatio, mutual
+  uri, followedBy, "following", userInteractionRatio, mutual, last_recorded
 from
   following
 `
@@ -184,6 +184,7 @@ func (q *Queries) ListAllFollowing(ctx context.Context) ([]Following, error) {
 			&i.Following,
 			&i.UserInteractionRatio,
 			&i.Mutual,
+			&i.LastRecorded,
 		); err != nil {
 			return nil, err
 		}
@@ -261,6 +262,53 @@ func (q *Queries) ListFollowerLastRecordedBefore(ctx context.Context, arg ListFo
 	for rows.Next() {
 		var i ListFollowerLastRecordedBeforeRow
 		if err := rows.Scan(&i.Following, &i.FollowedBy, &i.LastRecorded); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFollowingLastRecordedBefore = `-- name: ListFollowingLastRecordedBefore :many
+select
+  uri,
+  last_recorded
+from
+  following
+where
+  "followedBy" = ?
+  and (
+    last_recorded is NULL
+    or last_recorded < ?
+  )
+`
+
+type ListFollowingLastRecordedBeforeParams struct {
+	FollowedBy   string
+	LastRecorded sql.NullString
+}
+
+type ListFollowingLastRecordedBeforeRow struct {
+	Uri          string
+	LastRecorded sql.NullString
+}
+
+func (q *Queries) ListFollowingLastRecordedBefore(ctx context.Context, arg ListFollowingLastRecordedBeforeParams) ([]ListFollowingLastRecordedBeforeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFollowingLastRecordedBefore, arg.FollowedBy, arg.LastRecorded)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFollowingLastRecordedBeforeRow{}
+	for rows.Next() {
+		var i ListFollowingLastRecordedBeforeRow
+		if err := rows.Scan(&i.Uri, &i.LastRecorded); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
