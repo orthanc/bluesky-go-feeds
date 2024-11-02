@@ -107,13 +107,16 @@ func catchupVariant(name string, query string, ctx context.Context, database dat
 }
 
 func catchup(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	fmt.Printf("[FEED] Catchup for %s since %s\n", session.UserDid, session.PostsSince)
 	return catchupVariant("catchup", catchupQuery, ctx, database, session, cursor, limit)
 }
 
 func catchupMutuals(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	fmt.Printf("[FEED] Catchup Mutuals for %s since %s\n", session.UserDid, session.PostsSince)
 	return catchupVariant("catchupMutuals", catchupMutualsQuery, ctx, database, session, cursor, limit)
 }
 
 func catchupFollowers(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	fmt.Printf("[FEED] Catchup Followers for %s since %s\n", session.UserDid, session.PostsSince)
 	return catchupVariant("catchupFollowers", catchupFollowersQuery, ctx, database, session, cursor, limit)
 }

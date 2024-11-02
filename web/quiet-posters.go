@@ -59,6 +59,7 @@ offset
 `
 
 func quietPosters(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	fmt.Printf("[FEED] Quiet People for %s since %s\n", session.UserDid, session.PostsSince)
 	output := bsky.FeedGetFeedSkeleton_Output{
 		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}

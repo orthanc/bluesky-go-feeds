@@ -106,6 +106,7 @@ offset
 `
 
 func goodStuff(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	fmt.Printf("[FEED] Goodstuff for %s\n", session.UserDid)
 	output := bsky.FeedGetFeedSkeleton_Output{
 		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}
