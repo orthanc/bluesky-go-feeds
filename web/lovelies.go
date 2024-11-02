@@ -63,7 +63,8 @@ offset
 `
 
 func lovelies(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
-	fmt.Printf("[FEED] Lovelies for %s\n", session.UserDid)
+	endLog := logFeedAccess("lovelies", session)
+	defer endLog()
 	output := bsky.FeedGetFeedSkeleton_Output{
 		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}

@@ -39,7 +39,8 @@ offset
 `
 
 func youMightLike(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
-	fmt.Printf("[FEED] You might like for %s\n", session.UserDid)
+	endLog := logFeedAccess("youMayLike", session)
+	defer endLog()
 	output := bsky.FeedGetFeedSkeleton_Output{
 		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}
