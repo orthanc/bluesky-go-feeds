@@ -40,6 +40,18 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		w.WriteHeader(400)
 		return
 	}
+	
+	cursor := r.URL.Query().Get("cursor")
+	limit := 30
+	limitParam := r.URL.Query().Get("limit")
+	if limitParam != "" {
+		parsedLimit, err := strconv.Atoi(limitParam)
+		if err != nil {
+			fmt.Printf("invalid limit %s: %s\n", limitParam, err)
+			w.WriteHeader(400)
+		}
+		limit = parsedLimit
+	}
 
 	userDid, err := validateAuth(r)
 	if err != nil {
@@ -47,6 +59,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		w.WriteHeader(401)
 		return
 	}
+	fmt.Printf("FEED SKELETON %s %s %s(%d)\n", algKey, userDid, cursor, limit)
 
 	ctx := context.Background()
 	lastSessionResult, err := handler.database.Queries.GetLastSession(ctx, schema.GetLastSessionParams{
@@ -117,17 +130,6 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	cursor := r.URL.Query().Get("cursor")
-	limit := 30
-	limitParam := r.URL.Query().Get("limit")
-	if limitParam != "" {
-		parsedLimit, err := strconv.Atoi(limitParam)
-		if err != nil {
-			fmt.Printf("invalid limit %s: %s\n", limitParam, err)
-			w.WriteHeader(400)
-		}
-		limit = parsedLimit
-	}
 	result, err := alg(ctx, *handler.database, lastSession, cursor, limit)
 	if err != nil {
 		fmt.Printf("Error calling %s for %s: %s\n", feedUri, userDid, err)
