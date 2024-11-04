@@ -51,11 +51,11 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 		indexAsDate := createdAt.UTC();
 		if now.Before(indexAsDate) {
-			fmt.Printf("Ignoring future create date %s on post, using %s instead\n", indexAsDate, now)
+			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Author, now)
 			indexAsDate = now
 		}
 		if indexAsDate.Before(now.Add(-7 * 24 * time.Hour)) {
-			fmt.Printf("Dropping post with create date %s, more than 7 days ago\n", indexAsDate)
+			fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", event.Author, indexAsDate)
 			return nil
 		}
 		
