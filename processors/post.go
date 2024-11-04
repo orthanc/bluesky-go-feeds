@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/bluesky-social/indigo/repomgr"
@@ -43,7 +44,21 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			processor.AllFollowing.IsUser(replyRootAuthor)) {
 			return nil
 		}
-
+		now := time.Now().UTC()
+		createdAt, err := time.Parse(time.RFC3339, event.Record["createdAt"].(string))
+		if err != nil {
+			return err
+		}
+		indexAsDate := createdAt.UTC();
+		if now.Before(indexAsDate) {
+			fmt.Printf("Ignoring future create date %s on post, using %s instead\n", indexAsDate, now)
+			indexAsDate = now
+		}
+		if indexAsDate.Before(now.Add(-7 * 24 * time.Hour)) {
+			fmt.Printf("Dropping post with create date %s, more than 7 days ago\n", indexAsDate)
+			return nil
+		}
+		
 		updates, tx, err := processor.Database.BeginTx(ctx)
 		if err != nil {
 			return err
