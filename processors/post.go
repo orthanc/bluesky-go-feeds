@@ -44,7 +44,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			processor.AllFollowing.IsUser(replyRootAuthor)) {
 			return nil
 		}
-		now := time.Now().UTC()
+		now := time.Now().UTC().Add(time.Minute)
 		createdAt, err := time.Parse(time.RFC3339, event.Record["createdAt"].(string))
 		if err != nil {
 			return err
@@ -64,7 +64,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			return err
 		}
 		defer tx.Rollback()
-		indexedAt := time.Now().UTC().Format(time.RFC3339)
+		indexedAt := indexAsDate.Format(time.RFC3339)
 		if processor.AllFollowing.IsAuthor(event.Author) {
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,
