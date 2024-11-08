@@ -22,7 +22,7 @@ select
   post.uri,
   (
     unixepoch ("indexed_at") - unixepoch ('now', '-7 days')
-  ) / (24.0 * 3600) as t_score
+  ) / (24.0 * 36) as t_score
 from
   post_interacted_by_followed as post
   left join post_interacted_by_followed_author as author on post.author = author.author and post.user = author.user
@@ -31,7 +31,7 @@ where
   and post.author <> post.user
 	and author.followed = 0
 order by
-  10 * post.followed_interaction_count + author.followed_interaction_count + 100 * t_score DESC
+  10 * post.followed_interaction_count + t_score DESC
 limit
   ?
 offset
