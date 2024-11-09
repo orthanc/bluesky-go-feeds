@@ -43,7 +43,7 @@ func youMightLike(ctx context.Context, database database.Database, session schem
 	endLog := logFeedAccess("youMayLike", session)
 	defer endLog()
 	output := bsky.FeedGetFeedSkeleton_Output{
-		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit+1),
+		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
 	}
 	offset := 0
 	if cursor != "" {
@@ -52,15 +52,6 @@ func youMightLike(ctx context.Context, database database.Database, session schem
 			return output, fmt.Errorf("unable to parse cursor %s: %w", cursor, err)
 		}
 		offset = parsedOffset
-	} else {
-		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
-			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lafjoouhnl2w",
-			Reason: &bsky.FeedDefs_SkeletonFeedPost_Reason{
-				FeedDefs_SkeletonReasonPin: &bsky.FeedDefs_SkeletonReasonPin{
-					LexiconTypeID: "app.bsky.feed.defs#skeletonReasonPin",
-				},
-			},
-		})
 	}
 	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
