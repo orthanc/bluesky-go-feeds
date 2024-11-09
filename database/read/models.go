@@ -64,6 +64,7 @@ type Post struct {
 	ReplyParentAuthor sql.NullString
 	ReplyRootAuthor   sql.NullString
 	RepostCount       float64
+	CreatedAt         sql.NullString
 }
 
 type PostInteractedByFollowed struct {

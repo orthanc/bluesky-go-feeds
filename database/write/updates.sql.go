@@ -459,6 +459,7 @@ insert into
     "author",
     "directReplyCount",
     "indexedAt",
+    created_at,
     "interactionCount",
     "likeCount",
     "replyCount",
@@ -469,13 +470,14 @@ insert into
     "replyRootAuthor"
   )
 values
-  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
 `
 
 type SavePostParams struct {
 	Author            string
 	DirectReplyCount  float64
 	IndexedAt         string
+	CreatedAt         sql.NullString
 	InteractionCount  float64
 	LikeCount         float64
 	ReplyCount        float64
@@ -491,6 +493,7 @@ func (q *Queries) SavePost(ctx context.Context, arg SavePostParams) error {
 		arg.Author,
 		arg.DirectReplyCount,
 		arg.IndexedAt,
+		arg.CreatedAt,
 		arg.InteractionCount,
 		arg.LikeCount,
 		arg.ReplyCount,

@@ -13,6 +13,7 @@ insert into
     "author",
     "directReplyCount",
     "indexedAt",
+    created_at,
     "interactionCount",
     "likeCount",
     "replyCount",
@@ -23,7 +24,7 @@ insert into
     "replyRootAuthor"
   )
 values
-  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: IncrementPostDirectReply :exec
 update post

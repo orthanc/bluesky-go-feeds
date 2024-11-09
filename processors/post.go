@@ -45,7 +45,8 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			return nil
 		}
 		now := time.Now().UTC().Add(time.Minute)
-		createdAt, err := time.Parse(time.RFC3339, event.Record["createdAt"].(string))
+		rawCreatedAt := event.Record["createdAt"].(string)
+		createdAt, err := time.Parse(time.RFC3339, rawCreatedAt)
 		if err != nil {
 			return err
 		}
@@ -74,6 +75,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				ReplyRoot:         database.ToNullString(replyRoot),
 				ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
 				IndexedAt:         indexedAt,
+				CreatedAt:         database.ToNullString(rawCreatedAt),
 				DirectReplyCount:  0,
 				InteractionCount:  0,
 				LikeCount:         0,
