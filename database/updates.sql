@@ -290,6 +290,7 @@ values
   (?, ?, ?, ?, 1, 1, 1) on conflict do
 update
 set
+  indexed_at = excluded.indexed_at,
   followed_reply_count = followed_reply_count + 1,
   followed_direct_reply_count = followed_direct_reply_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
@@ -308,6 +309,7 @@ values
   (?, ?, ?, ?, 1, 1) on conflict do
 update
 set
+  indexed_at = excluded.indexed_at,
   followed_reply_count = followed_reply_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
 
@@ -325,6 +327,7 @@ values
   (?, ?, ?, ?, 1, 1) on conflict do
 update
 set
+  indexed_at = excluded.indexed_at,
   followed_like_count = followed_like_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
 
@@ -342,5 +345,6 @@ values
   (?, ?, ?, ?, 1, 1) on conflict do
 update
 set
+  indexed_at = excluded.indexed_at,
   followed_repost_count = followed_repost_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
