@@ -97,6 +97,22 @@ func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) 
 	return items, nil
 }
 
+const getPostCreatedAt = `-- name: GetPostCreatedAt :one
+select
+  created_at
+from
+  post
+where
+  uri = ?
+`
+
+func (q *Queries) GetPostCreatedAt(ctx context.Context, uri string) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, getPostCreatedAt, uri)
+	var created_at sql.NullString
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
 const listAllAuthors = `-- name: ListAllAuthors :many
 select
   "did"

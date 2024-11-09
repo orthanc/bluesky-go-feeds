@@ -19,6 +19,14 @@ from
 where
   "author" = ?;
 
+-- name: GetPostCreatedAt :one
+select
+  created_at
+from
+  post
+where
+  uri = ?;
+
 -- name: ListAllUsers :many
 select
   "userDid"

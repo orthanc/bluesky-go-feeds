@@ -67,6 +67,12 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		defer tx.Rollback()
 		indexedAt := indexAsDate.Format(time.RFC3339)
 		if processor.AllFollowing.IsAuthor(event.Author) {
+			if event.Author == replyParentAuthor && event.Author == replyRootAuthor {
+				rootCreatedAt, _ := processor.Database.Queries.GetPostCreatedAt(ctx, replyRoot)
+				if rootCreatedAt.String == rawCreatedAt {
+					fmt.Printf("Thread found starting with %s timestamp %s\n", replyRoot, rawCreatedAt)
+				}
+			}
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,
 				Author:            event.Author,
