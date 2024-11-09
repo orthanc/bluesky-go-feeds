@@ -30,6 +30,7 @@ where
   post.user = ?
   and post.author <> post.user
 	and author.followed = 0
+	and indexed_at >= ?
 order by
   10 * post.followed_interaction_count + t_score DESC
 limit
@@ -61,7 +62,7 @@ func youMightLike(ctx context.Context, database database.Database, session schem
 			},
 		})
 	}
-	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, limit, offset)
+	rows, err := database.QueryContext(ctx, youMightLikeQuery, session.UserDid, session.PostsSince, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing youMightLike query: %s", err)
 	}
