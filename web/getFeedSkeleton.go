@@ -104,18 +104,25 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 			AccessCount: sql.NullFloat64{Float64: 0, Valid: true},
 			Algo:        database.ToNullString(algKey),
 		}
-		err = handler.database.Updates.SaveSession(ctx, writeSchema.SaveSessionParams{
-			UserDid:     lastSession.UserDid,
-			StartedAt:   lastSession.StartedAt,
-			LastSeen:    lastSession.LastSeen,
-			PostsSince:  lastSession.PostsSince,
-			AccessCount: lastSession.AccessCount,
-			Algo:        lastSession.Algo,
-		})
-		if err != nil {
-			fmt.Println(err)
-			w.WriteHeader(500)
-			return
+		// We only save the session if there's a hint that the user is actually looking.
+		// This prevents an accidental flick to the time based feeds resetting the session
+		if
+			cursor != "" || // if there's a cursor we're loading the second page so that's a good sign it's a real session
+			limit == 1 { // Generally limit is 30, but bluesky polls with limit one while the page is open to check for more
+			fmt.Printf("New session for %s/%s postsSince %s\n", userDid, algKey, lastSession.PostsSince)
+			err = handler.database.Updates.SaveSession(ctx, writeSchema.SaveSessionParams{
+				UserDid:     lastSession.UserDid,
+				StartedAt:   lastSession.StartedAt,
+				LastSeen:    lastSession.LastSeen,
+				PostsSince:  lastSession.PostsSince,
+				AccessCount: lastSession.AccessCount,
+				Algo:        lastSession.Algo,
+			})
+			if err != nil {
+				fmt.Println(err)
+				w.WriteHeader(500)
+				return
+			}
 		}
 	} else {
 		lastSession = lastSessionResult[0]
