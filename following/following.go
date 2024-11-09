@@ -35,6 +35,7 @@ type AllFollowing struct {
 var emptyFollowedBy []string
 
 const purgePageSize = 10000
+var cutoverTime = time.Date(2024, 11, 13, 8, 45, 0, 0, time.UTC)
 
 func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client, batchMutex *sync.Mutex) *AllFollowing {
 	allFollowing := &AllFollowing{
@@ -513,7 +514,18 @@ func pagedPurge(messageTemplate string, deletePage func() (int64, error)) (int64
 func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	allFollowing.batchMutex.Lock()
 	defer allFollowing.batchMutex.Unlock()
-	purgeBefore := time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339)
+	now := time.Now().UTC()
+	purgeBefore := now.Add(-7 * 24 * time.Hour).Format(time.RFC3339)
+	fmt.Printf("purgeBefore %s\n", purgeBefore)
+	purgeBefore3Time := now.Add(-3 * 24 * time.Hour)
+	fmt.Printf("now %s\n", now.Format(time.RFC3339))
+	fmt.Printf("purgeBefore3Time %s\n", purgeBefore3Time.Format(time.RFC3339))
+	if now.Before(cutoverTime) {
+		timeUntilCutover := cutoverTime.Sub(now);
+		fmt.Printf("timeUntilCutover %s\n", timeUntilCutover)
+		purgeBefore3Time = purgeBefore3Time.Add(-1 * timeUntilCutover)
+		fmt.Printf("purgeBefore3Time %s\n", purgeBefore3Time.Format(time.RFC3339))
+	}
 	updates := allFollowing.database.Updates
 	fmt.Printf("Purging data before %s\n", purgeBefore)
 
@@ -569,7 +581,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 
 	_, err = pagedPurge("Deleted %d interactions by followed", func() (int64, error) {
 		return updates.DeletePostInteractedByFollowedBefore(ctx, writeSchema.DeletePostInteractedByFollowedBeforeParams{
-			IndexedAt: purgeBefore,
+			IndexedAt: purgeBefore3Time.Format(time.RFC3339),
 			Limit:     purgePageSize,
 		})
 	})
