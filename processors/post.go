@@ -67,10 +67,18 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		defer tx.Rollback()
 		indexedAt := indexAsDate.Format(time.RFC3339)
 		if processor.AllFollowing.IsAuthor(event.Author) {
+			postIndexedAt := indexAsDate
 			if event.Author == replyParentAuthor && event.Author == replyRootAuthor {
-				rootCreatedAt, _ := processor.Database.Queries.GetPostCreatedAt(ctx, replyRoot)
-				if rootCreatedAt.String == rawCreatedAt {
-					fmt.Printf("Thread found starting with %s timestamp %s\n", replyRoot, rawCreatedAt)
+				parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
+				if parentPostDates.IndexedAt != "" {
+					parentIndexedAt, err := time.Parse(time.RFC3339, parentPostDates.IndexedAt)
+					if err == nil {
+						minIndexedAt := parentIndexedAt.Add(30 * time.Second)
+						if postIndexedAt.Before(minIndexedAt) {
+							fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Author, indexAsDate, postIndexedAt)
+							postIndexedAt = minIndexedAt
+						}
+					}
 				}
 			}
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
@@ -80,7 +88,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				ReplyParentAuthor: database.ToNullString(replyParentAuthor),
 				ReplyRoot:         database.ToNullString(replyRoot),
 				ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
-				IndexedAt:         indexedAt,
+				IndexedAt:         postIndexedAt.Format(time.RFC3339),
 				CreatedAt:         database.ToNullString(rawCreatedAt),
 				DirectReplyCount:  0,
 				InteractionCount:  0,

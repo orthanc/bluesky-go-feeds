@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/orthanc/feedgenerator/database"
@@ -83,6 +84,7 @@ where
     "replyParentAuthor" is null
     or "parentFollowing"."followedBy" = ?
   )
+  and "indexedAt" < ?
 union all
 select
   "authorScoredPost"."uri",
@@ -97,6 +99,7 @@ from
   "authorScoredPost"
 where
   "authorScoredPost"."author" = ?
+  and "indexedAt" < ?
 order by
   "rating" desc
 limit
@@ -119,7 +122,8 @@ func goodStuff(ctx context.Context, database database.Database, session schema.S
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, goodStuffQuery, session.UserDid, session.UserDid, session.UserDid, limit, offset)
+	now := time.Now().UTC().Format(time.RFC3339)
+	rows, err := database.QueryContext(ctx, goodStuffQuery, session.UserDid, session.UserDid, now, session.UserDid, now, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing good stuff query: %s", err)
 	}

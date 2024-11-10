@@ -97,8 +97,9 @@ func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) 
 	return items, nil
 }
 
-const getPostCreatedAt = `-- name: GetPostCreatedAt :one
+const getPostDates = `-- name: GetPostDates :one
 select
+  "indexedAt",
   created_at
 from
   post
@@ -106,11 +107,16 @@ where
   uri = ?
 `
 
-func (q *Queries) GetPostCreatedAt(ctx context.Context, uri string) (sql.NullString, error) {
-	row := q.db.QueryRowContext(ctx, getPostCreatedAt, uri)
-	var created_at sql.NullString
-	err := row.Scan(&created_at)
-	return created_at, err
+type GetPostDatesRow struct {
+	IndexedAt string
+	CreatedAt sql.NullString
+}
+
+func (q *Queries) GetPostDates(ctx context.Context, uri string) (GetPostDatesRow, error) {
+	row := q.db.QueryRowContext(ctx, getPostDates, uri)
+	var i GetPostDatesRow
+	err := row.Scan(&i.IndexedAt, &i.CreatedAt)
+	return i, err
 }
 
 const listAllAuthors = `-- name: ListAllAuthors :many

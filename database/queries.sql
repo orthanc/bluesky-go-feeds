@@ -19,8 +19,9 @@ from
 where
   "author" = ?;
 
--- name: GetPostCreatedAt :one
+-- name: GetPostDates :one
 select
+  "indexedAt",
   created_at
 from
   post

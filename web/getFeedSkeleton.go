@@ -33,14 +33,14 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	feedUri := syntax.ATURI(r.URL.Query().Get("feed"))
 	algKey := feedUri.RecordKey().String()
 	if algKey == testAlgorithmId {
-		algKey = catchupAlgorithmId
+		algKey = goodStuffAlgorithmId
 	}
 	alg := algorithms[algKey]
 	if feedUri.Authority().String() != PublisherDid || feedUri.Collection() != "app.bsky.feed.generator" || alg == nil {
 		w.WriteHeader(400)
 		return
 	}
-	
+
 	cursor := r.URL.Query().Get("cursor")
 	limit := 30
 	limitParam := r.URL.Query().Get("limit")
@@ -106,8 +106,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		}
 		// We only save the session if there's a hint that the user is actually looking.
 		// This prevents an accidental flick to the time based feeds resetting the session
-		if
-			cursor != "" || // if there's a cursor we're loading the second page so that's a good sign it's a real session
+		if cursor != "" || // if there's a cursor we're loading the second page so that's a good sign it's a real session
 			limit == 1 { // Generally limit is 30, but bluesky polls with limit one while the page is open to check for more
 			fmt.Printf("New session for %s/%s postsSince %s\n", userDid, algKey, lastSession.PostsSince)
 			err = handler.database.Updates.SaveSession(ctx, writeSchema.SaveSessionParams{
