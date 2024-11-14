@@ -80,7 +80,6 @@ func main() {
 	}).Process
 	fmt.Println("Starting")
 	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
-	// err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
 	if err != nil {
 		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
 	}
