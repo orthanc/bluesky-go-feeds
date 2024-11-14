@@ -26,11 +26,12 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 		}
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
-		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
-		authorIsFollowed := len(authorFollowedBy) > 0
+		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
+		// authorIsFollowed := len(authorFollowedBy) > 0
 		if !(processor.AllFollowing.IsUser(postAuthor) ||
-			processor.AllFollowing.IsAuthor(postAuthor) ||
-			authorIsFollowed) {
+			processor.AllFollowing.IsAuthor(postAuthor)) {
+			// ||
+			// authorIsFollowed) {
 			return nil
 		}
 
@@ -75,17 +76,17 @@ func (processor *LikeProcessor) Process(ctx context.Context, event subscription.
 			}
 		}
 
-		for _, followedBy := range authorFollowedBy {
-			err := updates.SavePostLikedByFollowing(ctx, writeSchema.SavePostLikedByFollowingParams{
-				User:      followedBy,
-				Uri:       postUri,
-				Author:    postAuthor,
-				IndexedAt: indexedAt,
-			})
-			if err != nil {
-				return err
-			}
-		}
+		// for _, followedBy := range authorFollowedBy {
+		// 	err := updates.SavePostLikedByFollowing(ctx, writeSchema.SavePostLikedByFollowingParams{
+		// 		User:      followedBy,
+		// 		Uri:       postUri,
+		// 		Author:    postAuthor,
+		// 		IndexedAt: indexedAt,
+		// 	})
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 		tx.Commit()
 	}
 	return nil

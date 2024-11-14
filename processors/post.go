@@ -36,7 +36,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
-		authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
+		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
 		if !(processor.AllFollowing.IsAuthor(event.Author) ||
 			processor.AllFollowing.IsAuthor(replyParentAuthor) ||
 			processor.AllFollowing.IsUser(replyParentAuthor) ||
@@ -68,19 +68,19 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		indexedAt := indexAsDate.Format(time.RFC3339)
 		if processor.AllFollowing.IsAuthor(event.Author) {
 			postIndexedAt := indexAsDate
-			if event.Author == replyParentAuthor && event.Author == replyRootAuthor {
-				parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
-				if parentPostDates.IndexedAt != "" {
-					parentIndexedAt, err := time.Parse(time.RFC3339, parentPostDates.IndexedAt)
-					if err == nil {
-						minIndexedAt := parentIndexedAt.Add(30 * time.Second)
-						if postIndexedAt.Before(minIndexedAt) {
-							fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Author, indexAsDate, postIndexedAt)
-							postIndexedAt = minIndexedAt
-						}
-					}
-				}
-			}
+			// if event.Author == replyParentAuthor && event.Author == replyRootAuthor {
+			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
+			// 	if parentPostDates.IndexedAt != "" {
+			// 		parentIndexedAt, err := time.Parse(time.RFC3339, parentPostDates.IndexedAt)
+			// 		if err == nil {
+			// 			minIndexedAt := parentIndexedAt.Add(30 * time.Second)
+			// 			if postIndexedAt.Before(minIndexedAt) {
+			// 				fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Author, indexAsDate, postIndexedAt)
+			// 				postIndexedAt = minIndexedAt
+			// 			}
+			// 		}
+			// 	}
+			// }
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               event.Uri,
 				Author:            event.Author,
@@ -98,32 +98,32 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			if err != nil {
 				return err
 			}
-			if replyParent != "" {
-				for _, followedBy := range authorFollowedBy {
-					err := updates.SavePostDirectRepliedToByFollowing(ctx, writeSchema.SavePostDirectRepliedToByFollowingParams{
-						User:      followedBy,
-						Uri:       replyParent,
-						Author:    replyParentAuthor,
-						IndexedAt: indexedAt,
-					})
-					if err != nil {
-						return err
-					}
-				}
-			}
-			if replyRoot != replyParent {
-				for _, followedBy := range authorFollowedBy {
-					err := updates.SavePostRepliedToByFollowing(ctx, writeSchema.SavePostRepliedToByFollowingParams{
-						User:      followedBy,
-						Uri:       replyRoot,
-						Author:    replyRootAuthor,
-						IndexedAt: indexedAt,
-					})
-					if err != nil {
-						return err
-					}
-				}
-			}
+			// if replyParent != "" {
+			// 	for _, followedBy := range authorFollowedBy {
+			// 		err := updates.SavePostDirectRepliedToByFollowing(ctx, writeSchema.SavePostDirectRepliedToByFollowingParams{
+			// 			User:      followedBy,
+			// 			Uri:       replyParent,
+			// 			Author:    replyParentAuthor,
+			// 			IndexedAt: indexedAt,
+			// 		})
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 	}
+			// }
+			// if replyRoot != replyParent {
+			// 	for _, followedBy := range authorFollowedBy {
+			// 		err := updates.SavePostRepliedToByFollowing(ctx, writeSchema.SavePostRepliedToByFollowingParams{
+			// 			User:      followedBy,
+			// 			Uri:       replyRoot,
+			// 			Author:    replyRootAuthor,
+			// 			IndexedAt: indexedAt,
+			// 		})
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 	}
+			// }
 		}
 		if processor.AllFollowing.IsAuthor(replyParentAuthor) {
 			err := updates.IncrementPostDirectReply(ctx, event.Uri)
