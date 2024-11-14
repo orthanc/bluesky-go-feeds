@@ -204,13 +204,17 @@ func Subscribe(initialCtx context.Context, service string, database *database.Da
 			}
 			eventCountSinceSync++
 			if eventCountSinceSync >= 1000 {
+				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
 				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
 					Service: service,
 					Cursor:  evt.Seq,
 				})
+				database.Updates.SaveCursor(ctx, writeSchema.SaveCursorParams{
+					Service: "jetstream",
+					Cursor:  parsedTime.UnixMicro(),
+				})
 				windowEnd := time.Now().UTC().UnixMilli()
 				timeSpent := windowEnd - windowStart
-				parsedTime, _ := time.Parse(time.RFC3339, evt.Time)
 				evtTime := parsedTime.UnixMilli()
 				caughtUp := evtTime - lastEvtTime
 				lagTime := windowEnd - evtTime
