@@ -2,11 +2,13 @@ package processor
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
-	"github.com/bluesky-social/indigo/repomgr"
+	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/following"
-	"github.com/orthanc/feedgenerator/subscription"
 )
 
 type FollowProcessor struct {
@@ -14,25 +16,29 @@ type FollowProcessor struct {
 	Database     *database.Database
 }
 
-func (processor *FollowProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
-	switch event.EventKind {
-	case repomgr.EvtKindCreateRecord:
-		subject := event.Record["subject"].(string)
-		if processor.AllFollowing.IsUser(event.Author) {
-			err := processor.AllFollowing.RecordFollow(ctx, event.Uri, event.Author, subject)
+func (processor *FollowProcessor) Process(ctx context.Context, event *models.Event, followUri string) error {
+	switch event.Commit.Operation {
+	case models.CommitOperationCreate:
+		var follow bsky.GraphFollow
+		if err := json.Unmarshal(event.Commit.Record, &follow); err != nil {
+			return fmt.Errorf("failed to unmarshal follow: %w", err)
+		}
+		subject := follow.Subject
+		if processor.AllFollowing.IsUser(event.Did) {
+			err := processor.AllFollowing.RecordFollow(ctx, followUri, event.Did, subject)
 			if err != nil {
 				return err
 			}
 		}
 		if processor.AllFollowing.IsUser(subject) {
-			err := processor.AllFollowing.RecordFollower(ctx, event.Uri, subject, event.Author)
+			err := processor.AllFollowing.RecordFollower(ctx, followUri, subject, event.Did)
 			if err != nil {
 				return err
 			}
 		}
-	case repomgr.EvtKindDeleteRecord:
-		if processor.AllFollowing.IsUser(event.Author) {
-			return processor.AllFollowing.RemoveFollow(ctx, event.Uri)
+	case models.CommitOperationDelete:
+		if processor.AllFollowing.IsUser(event.Did) {
+			return processor.AllFollowing.RemoveFollow(ctx, followUri)
 		}
 	}
 	return nil

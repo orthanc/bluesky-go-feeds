@@ -5,13 +5,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/orthanc/feedgenerator/database"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
+
+	"github.com/bluesky-social/jetstream/pkg/client"
+	js_sequentiial "github.com/bluesky-social/jetstream/pkg/client/schedulers/sequential"
+	"github.com/bluesky-social/jetstream/pkg/models"
 
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/atproto/data"
@@ -32,6 +38,47 @@ type FirehoseEvent struct {
 }
 
 type FirehoseEventListener func(context.Context, FirehoseEvent) error
+type JetstreamEventListener func(context.Context, *models.Event, string) error
+
+
+func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener) error {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: true,
+	})))
+
+	config := client.DefaultClientConfig()
+	config.WebsocketURL = serverAddr
+	config.Compress = true
+	
+	for collection, _ := range listeners {
+		config.WantedCollections = append(config.WantedCollections, collection)
+	}
+	
+
+	logger := slog.Default()
+	scheduler := js_sequentiial.NewScheduler("feed_generator", logger, func (ctx context.Context, event *models.Event) error {
+		if event.Commit != nil {
+			listener := listeners[event.Commit.Collection]
+			return listener(ctx, event, fmt.Sprintf("at://%s/%s/%s", event.Did, event.Commit.Collection, event.Commit.RKey))
+		}
+	
+		return nil
+	})
+
+	client, err := client.NewClient(config, logger, scheduler)
+	if err != nil {
+		log.Fatalf("failed to create client: %v", err)
+	}
+
+	cursor := time.Now().Add(5 * -time.Minute).UnixMicro()
+
+	if err := client.ConnectAndRead(ctx, &cursor); err != nil {
+		log.Fatalf("failed to connect: %v", err)
+	}
+	log.Print("Started")
+	return nil
+}
 
 func parseEvent(ctx context.Context, evt *atproto.SyncSubscribeRepos_Commit, op *atproto.SyncSubscribeRepos_RepoOp) (FirehoseEvent, error) {
 	parts := strings.SplitN(op.Path, "/", 3)

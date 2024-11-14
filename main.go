@@ -61,7 +61,7 @@ func main() {
 	ratios.NewRatios(database, batchMutex)
 
 	go web.StartServer(database, allFollowing)
-	firehoseListeners := make(map[string]subscription.FirehoseEventListener)
+	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{
 		Database:     database,
 		AllFollowing: allFollowing,
@@ -79,7 +79,8 @@ func main() {
 		AllFollowing: allFollowing,
 	}).Process
 	fmt.Println("Starting")
-	err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
+	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
+	// err = subscription.Subscribe(ctx, os.Getenv("FEEDGEN_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
 	if err != nil {
 		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
 	}

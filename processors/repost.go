@@ -2,11 +2,13 @@ package processor
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
-	"github.com/bluesky-social/indigo/repomgr"
+	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/following"
-	"github.com/orthanc/feedgenerator/subscription"
 )
 
 type RepostProcessor struct {
@@ -14,17 +16,21 @@ type RepostProcessor struct {
 	Database     *database.Database
 }
 
-func (processor *RepostProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
-	switch event.EventKind {
-	case repomgr.EvtKindCreateRecord:
-		postUri := event.Record["subject"].(map[string]any)["uri"].(string)
+func (processor *RepostProcessor) Process(ctx context.Context, event *models.Event, repostUri string) error {
+	switch event.Commit.Operation {
+	case models.CommitOperationCreate:
+		var repost bsky.FeedRepost
+		if err := json.Unmarshal(event.Commit.Record, &repost); err != nil {
+			return fmt.Errorf("failed to unmarshal repost: %w", err)
+		}
+		postUri := repost.Subject.Uri
 		postAuthor := getAuthorFromPostUri(postUri)
 		if postAuthor == "" {
 			return nil
 		}
 
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
-		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
+		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
 		if !(processor.AllFollowing.IsAuthor(postAuthor)) { 
 			// ||

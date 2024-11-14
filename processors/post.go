@@ -2,14 +2,15 @@ package processor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/bluesky-social/indigo/repomgr"
+	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
 	"github.com/orthanc/feedgenerator/following"
-	"github.com/orthanc/feedgenerator/subscription"
 )
 
 type PostProcessor struct {
@@ -17,27 +18,27 @@ type PostProcessor struct {
 	Database     *database.Database
 }
 
-func (processor *PostProcessor) Process(ctx context.Context, event subscription.FirehoseEvent) error {
-	switch event.EventKind {
-	case repomgr.EvtKindCreateRecord:
+func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
+	switch event.Commit.Operation {
+	case models.CommitOperationCreate:
+		var post bsky.FeedPost
+		if err := json.Unmarshal(event.Commit.Record, &post); err != nil {
+			return fmt.Errorf("failed to unmarshal post: %w", err)
+		}
+
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor string
-		reply := event.Record["reply"]
-		if reply != nil {
-			parent := (reply.(map[string]any))["parent"]
-			if parent != nil {
-				replyParent = parent.(map[string]any)["uri"].(string)
-				replyParentAuthor = getAuthorFromPostUri(replyParent)
+		if post.Reply != nil {
+			if post.Reply.Parent != nil {
+				replyParentAuthor = getAuthorFromPostUri(post.Reply.Parent.Uri)
 			}
-			root := (reply.(map[string]any))["root"]
-			if parent != nil {
-				replyRoot = root.(map[string]any)["uri"].(string)
-				replyRootAuthor = getAuthorFromPostUri(replyRoot)
+			if post.Reply.Root != nil {
+				replyRootAuthor = getAuthorFromPostUri(post.Reply.Root.Uri)
 			}
 		}
 
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
-		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Author)
-		if !(processor.AllFollowing.IsAuthor(event.Author) ||
+		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
+		if !(processor.AllFollowing.IsAuthor(event.Did) ||
 			processor.AllFollowing.IsAuthor(replyParentAuthor) ||
 			processor.AllFollowing.IsUser(replyParentAuthor) ||
 			processor.AllFollowing.IsAuthor(replyRootAuthor) ||
@@ -45,18 +46,18 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			return nil
 		}
 		now := time.Now().UTC().Add(time.Minute)
-		rawCreatedAt := event.Record["createdAt"].(string)
+		rawCreatedAt := post.CreatedAt
 		createdAt, err := time.Parse(time.RFC3339, rawCreatedAt)
 		if err != nil {
 			return err
 		}
 		indexAsDate := createdAt.UTC();
 		if now.Before(indexAsDate) {
-			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Author, now)
+			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Did, now)
 			indexAsDate = now
 		}
 		if indexAsDate.Before(now.Add(-7 * 24 * time.Hour)) {
-			fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", event.Author, indexAsDate)
+			fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", event.Did, indexAsDate)
 			return nil
 		}
 		
@@ -66,24 +67,24 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		}
 		defer tx.Rollback()
 		indexedAt := indexAsDate.Format(time.RFC3339)
-		if processor.AllFollowing.IsAuthor(event.Author) {
+		if processor.AllFollowing.IsAuthor(event.Did) {
 			postIndexedAt := indexAsDate
-			// if event.Author == replyParentAuthor && event.Author == replyRootAuthor {
+			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
 			// 	if parentPostDates.IndexedAt != "" {
 			// 		parentIndexedAt, err := time.Parse(time.RFC3339, parentPostDates.IndexedAt)
 			// 		if err == nil {
 			// 			minIndexedAt := parentIndexedAt.Add(30 * time.Second)
 			// 			if postIndexedAt.Before(minIndexedAt) {
-			// 				fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Author, indexAsDate, postIndexedAt)
+			// 				fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Did, indexAsDate, postIndexedAt)
 			// 				postIndexedAt = minIndexedAt
 			// 			}
 			// 		}
 			// 	}
 			// }
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
-				Uri:               event.Uri,
-				Author:            event.Author,
+				Uri:               postUri,
+				Author:            event.Did,
 				ReplyParent:       database.ToNullString(replyParent),
 				ReplyParentAuthor: database.ToNullString(replyParentAuthor),
 				ReplyRoot:         database.ToNullString(replyRoot),
@@ -126,16 +127,16 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 			// }
 		}
 		if processor.AllFollowing.IsAuthor(replyParentAuthor) {
-			err := updates.IncrementPostDirectReply(ctx, event.Uri)
+			err := updates.IncrementPostDirectReply(ctx, postUri)
 			if err != nil {
 				return err
 			}
 
-			if processor.AllFollowing.IsUser(event.Author) && event.Author != replyParentAuthor {
+			if processor.AllFollowing.IsUser(event.Did) && event.Did != replyParentAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
-					InteractionUri: event.Uri,
+					InteractionUri: postUri,
 					AuthorDid:      replyParentAuthor,
-					UserDid:        event.Author,
+					UserDid:        event.Did,
 					PostUri:        replyParent,
 					Type:           "reply",
 					IndexedAt:      indexedAt,
@@ -145,11 +146,11 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 				}
 			}
 		}
-		if processor.AllFollowing.IsUser(replyParentAuthor) && event.Author != replyParentAuthor {
+		if processor.AllFollowing.IsUser(replyParentAuthor) && event.Did != replyParentAuthor {
 			// Someone replying a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
-				InteractionUri:       event.Uri,
-				InteractionAuthorDid: event.Author,
+				InteractionUri:       postUri,
+				InteractionAuthorDid: event.Did,
 				UserDid:              replyParentAuthor,
 				PostUri:              replyParent,
 				Type:                 "reply",
@@ -164,16 +165,16 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 		// the reply parent and reply root are different
 		if replyParent != replyRoot {
 			if processor.AllFollowing.IsAuthor(replyRootAuthor) {
-				err := updates.IncrementPostIndirectReply(ctx, event.Uri)
+				err := updates.IncrementPostIndirectReply(ctx, postUri)
 				if err != nil {
 					return err
 				}
 
-				if processor.AllFollowing.IsUser(event.Author) && event.Author != replyRootAuthor {
+				if processor.AllFollowing.IsUser(event.Did) && event.Did != replyRootAuthor {
 					err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
-						InteractionUri: event.Uri,
+						InteractionUri: postUri,
 						AuthorDid:      replyRootAuthor,
-						UserDid:        event.Author,
+						UserDid:        event.Did,
 						PostUri:        replyRoot,
 						Type:           "threadReply",
 						IndexedAt:      indexedAt,
@@ -183,11 +184,11 @@ func (processor *PostProcessor) Process(ctx context.Context, event subscription.
 					}
 				}
 			}
-			if processor.AllFollowing.IsUser(replyRootAuthor) && event.Author != replyRootAuthor {
+			if processor.AllFollowing.IsUser(replyRootAuthor) && event.Did != replyRootAuthor {
 				// Someone replying a post by one of the users
 				err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
-					InteractionUri:       event.Uri,
-					InteractionAuthorDid: event.Author,
+					InteractionUri:       postUri,
+					InteractionAuthorDid: event.Did,
 					UserDid:              replyRootAuthor,
 					PostUri:              replyRoot,
 					Type:                 "threadReply",

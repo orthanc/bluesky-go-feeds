@@ -11,6 +11,7 @@ Environment=PATH=/usr/bin:/usr/local/bin
 Environment=FEEDGEN_PORT=3000
 Environment=FEEDGEN_LISTENHOST=localhost
 Environment=FEEDGEN_SUBSCRIPTION_ENDPOINT=wss://bsky.network
+Environment=JETSTREAM_SUBSCRIPTION_ENDPOINT=wss://jetstream2.us-west.bsky.network/subscribe
 Environment=FEEDGEN_SQLITE_LOCATION="/home/feedgenerator/feed-data.db"
 Environment=FEEDGEN_PUBLISHER_DID={{ feed_publisher_did }}
 Environment=FEEDGEN_HOSTNAME={{ feed_hostname }}
