@@ -48,10 +48,6 @@ func NewAllFollowing(database *database.Database, client *xrpc.Client, publicCli
 	ctx := context.Background()
 	ticker := time.NewTicker(time.Hour)
 	go func() {
-		err := allFollowing.Purge(ctx)
-		if err != nil {
-			fmt.Printf("Error purging data: %s\n", err)
-		}
 		for range ticker.C {
 			err := allFollowing.Purge(ctx)
 			if err != nil {

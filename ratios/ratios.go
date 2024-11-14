@@ -25,10 +25,6 @@ func NewRatios(database *database.Database, batchMutex *sync.Mutex) *Ratios {
 
 	ticker := time.NewTicker(6 * time.Hour)
 	go func() {
-		err := ratios.UpdateAllRatios(ctx)
-		if err != nil {
-			fmt.Printf("Error updating ratios: %s\n", err)
-		}
 		for range ticker.C {
 			err := ratios.UpdateAllRatios(ctx)
 			if err != nil {
