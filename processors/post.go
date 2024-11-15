@@ -29,10 +29,12 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor string
 		if post.Reply != nil {
 			if post.Reply.Parent != nil {
-				replyParentAuthor = getAuthorFromPostUri(post.Reply.Parent.Uri)
+				replyParent = post.Reply.Parent.Uri
+				replyParentAuthor = getAuthorFromPostUri(replyParent)
 			}
 			if post.Reply.Root != nil {
-				replyRootAuthor = getAuthorFromPostUri(post.Reply.Root.Uri)
+				replyRoot = post.Reply.Root.Uri
+				replyRootAuthor = getAuthorFromPostUri(replyRoot)
 			}
 		}
 
