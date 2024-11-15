@@ -3,7 +3,6 @@ package subscription
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -33,7 +32,17 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 	for collection, _ := range listeners {
 		config.WantedCollections = append(config.WantedCollections, collection)
 	}
-	
+
+
+	cursorResult, err := database.Queries.GetCursor(ctx, "jetstream")
+	cursor := time.Now().Add(5 * -time.Minute).UnixMicro()
+	if err != nil {
+		return fmt.Errorf("unable to load cursor: %w", err)
+	}
+	if len(cursorResult) > 0 {
+		cursor = cursorResult[0].Cursor
+		fmt.Printf("Cursor from db %d\n", cursor)
+	}
 
 	eventCountSinceSync := 0
 	windowStart := time.Now().UTC().UnixMilli()
@@ -77,29 +86,21 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 				eventCountSinceSync = 0
 			}
 		}
+		cursor = event.TimeUS
 	
 		return nil
 	})
 
-	client, err := client.NewClient(config, logger, scheduler)
-	if err != nil {
-		log.Fatalf("failed to create client: %v", err)
+	for {
+		fmt.Printf("Connecting at cursor %d\n", cursor)
+		client, err := client.NewClient(config, logger, scheduler)
+		if err == nil {
+			if err := client.ConnectAndRead(ctx, &cursor); err != nil {
+				fmt.Printf("failed to connect: %v\n", err)
+			}
+		} else {
+			fmt.Printf("failed to create client: %v\n", err)
+		}
+		time.Sleep(time.Duration(5) * time.Second)
 	}
-
-	cursorResult, err := database.Queries.GetCursor(ctx, "jetstream")
-	cursor := time.Now().Add(5 * -time.Minute).UnixMicro()
-	if err != nil {
-		return fmt.Errorf("unable to load cursor: %w", err)
-	}
-	if len(cursorResult) > 0 {
-		cursor = cursorResult[0].Cursor
-		fmt.Printf("Cursor from db %d\n", cursor)
-	}
-
-
-	if err := client.ConnectAndRead(ctx, &cursor); err != nil {
-		log.Fatalf("failed to connect: %v", err)
-	}
-	log.Print("Started")
-	return nil
 }
