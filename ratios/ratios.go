@@ -134,6 +134,7 @@ func (ratios *Ratios) UpdateAllMediansForAuthor(ctx context.Context, authorDid s
 	}
 
 	err = ratios.database.Updates.UpdateAuthorMedians(ctx, writeSchema.UpdateAuthorMediansParams{
+		Did: authorDid,
 		MedianDirectReplyCount: median(directReplyCounts, 0),
 		MedianInteractionCount: median(interactionCounts, 0),
 		MedianLikeCount:        median(likeCounts, 0),
