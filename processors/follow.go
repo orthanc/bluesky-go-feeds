@@ -21,7 +21,8 @@ func (processor *FollowProcessor) Process(ctx context.Context, event *models.Eve
 	case models.CommitOperationCreate:
 		var follow bsky.GraphFollow
 		if err := json.Unmarshal(event.Commit.Record, &follow); err != nil {
-			return fmt.Errorf("failed to unmarshal follow: %w", err)
+			fmt.Printf("failed to unmarshal follow: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
+			return nil
 		}
 		subject := follow.Subject
 		if processor.AllFollowing.IsUser(event.Did) {

@@ -23,7 +23,8 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 	case models.CommitOperationCreate:
 		var post bsky.FeedPost
 		if err := json.Unmarshal(event.Commit.Record, &post); err != nil {
-			return fmt.Errorf("failed to unmarshal post: %w", err)
+			fmt.Printf("failed to unmarshal post: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
+			return nil
 		}
 
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor string

@@ -21,9 +21,10 @@ type LikeProcessor struct {
 func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event, likeUri string) error {
 	switch event.Commit.Operation {
 	case models.CommitOperationCreate:
-		var like bsky.FeedLike
+	var like bsky.FeedLike
 		if err := json.Unmarshal(event.Commit.Record, &like); err != nil {
-			return fmt.Errorf("failed to unmarshal like: %w", err)
+			fmt.Printf("failed to unmarshal like: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
+			return nil
 		}
 		postUri := like.Subject.Uri
 		postAuthor := getAuthorFromPostUri(postUri)

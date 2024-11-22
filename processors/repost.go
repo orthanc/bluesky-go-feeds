@@ -21,7 +21,8 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 	case models.CommitOperationCreate:
 		var repost bsky.FeedRepost
 		if err := json.Unmarshal(event.Commit.Record, &repost); err != nil {
-			return fmt.Errorf("failed to unmarshal repost: %w", err)
+			fmt.Printf("failed to unmarshal repost: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
+			return nil
 		}
 		postUri := repost.Subject.Uri
 		postAuthor := getAuthorFromPostUri(postUri)
