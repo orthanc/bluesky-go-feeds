@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -60,11 +59,10 @@ update "following" set "userInteractionRatio" = (
 `
 
 var updatePostCountsSql string = `
-update "author" set (postCount, medianReplyCount, medianDirectReplyCount, medianLikeCount, medianInteractionCount) = (
-	select count(*), median(replyCount), median(directReplyCount), median(likeCount), median(interactionCount)
+update "author" set postCount = (
+	select count(*)
 	from "post" where "post"."author" = "author"."did"
 )
-where did IN 
 `
 
 // async updateAllMedians() {
@@ -83,6 +81,8 @@ where did IN
 // 	console.log(`User Medians updated`);
 // }
 
+const medianUpdateSize = 250
+
 func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	ratios.batchMutex.Lock()
 	defer ratios.batchMutex.Unlock()
@@ -91,27 +91,20 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// for ind, authorDid := range authors {
-	// 	err = ratios.UpdateAllMediansForAuthor(ctx, authorDid)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if ind%1000 == 0 {
-	// 		fmt.Printf("Updated %d author medians\n", ind)
-	// 		// time.Sleep(250 * time.Millisecond)
-	// 	}
-	// }
-	fmt.Println("Updating post counts")
-	for i := 0; i < len(authors); i+= 1000 {
-		batch := authors[i:]
-		if len(batch) > 1000 {
-			batch = batch[:1000]
-		}
-		err := ratios.UpdatePostCounts(ctx, batch)
+	for ind, authorDid := range authors {
+		err = ratios.UpdateAllMediansForAuthor(ctx, authorDid)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Updated %d author medians\n", i + len(batch))
+		if ind%1000 == 0 {
+			fmt.Printf("Updated %d author medians\n", ind)
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	fmt.Println("Updating post counts")
+	err = ratios.UpdatePostCounts(ctx)
+	if err != nil {
+		return err
 	}
 	fmt.Println("Updated post counts")
 	err = ratios.RecalculateInteractionScores(ctx)
@@ -122,8 +115,8 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	return nil
 }
 
-func (ratios *Ratios) UpdatePostCounts(ctx context.Context, dids []string) error {
-	_, err := ratios.database.ExecContext(ctx, updatePostCountsSql + "('" + strings.Join(dids, "', '")+ "')")
+func (ratios *Ratios) UpdatePostCounts(ctx context.Context) error {
+	_, err := ratios.database.ExecContext(ctx, updatePostCountsSql)
 	return err
 }
 
