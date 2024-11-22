@@ -32,8 +32,8 @@ func NewGetFeedSkeleton(database *database.Database, following *following.AllFol
 func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	feedUri := syntax.ATURI(r.URL.Query().Get("feed"))
 	algKey := feedUri.RecordKey().String()
-	if algKey == testAlgorithmId {
-		algKey = followerRouletteAlgorithmId
+	if algKey == debugAlgorithmId {
+		algKey = debugAlgorithmId
 	}
 	alg := algorithms[algKey]
 	if feedUri.Authority().String() != PublisherDid || feedUri.Collection() != "app.bsky.feed.generator" || alg == nil {

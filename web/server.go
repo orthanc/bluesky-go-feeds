@@ -35,8 +35,6 @@ func describeFeedGenerator(w http.ResponseWriter, r *http.Request) {
 	for key := range algorithms {
 		feeds = append(feeds, &bsky.FeedDescribeFeedGenerator_Feed{Uri: fmt.Sprintf("at://%s/app.bsky.feed.generator/%s", PublisherDid, key)})
 	}
-	// Add the test algorithm so we can call it, this is swapped out with one of the real algorithms in get feed skeleton
-	feeds = append(feeds, &bsky.FeedDescribeFeedGenerator_Feed{Uri: fmt.Sprintf("at://%s/app.bsky.feed.generator/%s", PublisherDid, testAlgorithmId)})
 	data, err := json.Marshal(bsky.FeedDescribeFeedGenerator_Output{
 		Did:   ServiceDid,
 		Feeds: feeds,

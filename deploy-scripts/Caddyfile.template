@@ -1,6 +1,11 @@
 {{ feed_hostname }} {
   tls {{ tls_contact_email }}
   @dev query feed=at://{{ feed_publisher_did }}/app.bsky.feed.generator/replies-foll
-  reverse_proxy @dev http://localhost:4000
+  reverse_proxy @dev  http://localhost:4000 http://localhost:3000 {
+    lb_policy first
+    lb_retries 5
+    fail_duration 5s
+    health_uri /.well-known/did.json
+  }
   reverse_proxy http://localhost:3000
 }
