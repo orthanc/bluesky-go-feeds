@@ -82,25 +82,37 @@ update "author" set postCount = (
 // 	console.log(`User Medians updated`);
 // }
 
+const updateAuthorMedians = `update author
+set
+  "postCount" = ?,
+  "medianInteractionCount" = ?
+where
+  "did" = ?
+`
+
+type updateAuthorMediansParams struct {
+	postCount              float64
+	medianInteractionCount float64
+	did                    string
+}
+
 func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) error {
 	query := fmt.Sprintf(
-		"select author, 0, 0, 0, median(interactionCount) from post where author IN (%s) group by author",
+		"select author, count(*), median(interactionCount) from post where author IN (%s) group by author",
 		"'"+strings.Join(batch, "','")+"'")
 	rows, err := ratios.database.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("error calculating author stats: %s", err)
 	}
 	defer rows.Close()
-	toSave := make([]writeSchema.UpdateAuthorMediansParams, len(batch))
+	toSave := make([]updateAuthorMediansParams, len(batch))
 	ind := 0
 	for rows.Next() {
 		row := toSave[ind]
 		err := rows.Scan(
-			&row.Did,
-			&row.MedianLikeCount,
-			&row.MedianReplyCount,
-			&row.MedianDirectReplyCount,
-			&row.MedianInteractionCount,
+			&row.did,
+			&row.postCount,
+			&row.medianInteractionCount,
 		)
 		ind++
 		if err != nil {
@@ -108,13 +120,13 @@ func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) err
 		}
 	}
 
-	updates, tx, err := ratios.database.BeginTx(ctx)
+	_, tx, err := ratios.database.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	for _, row := range toSave {
-		err = updates.UpdateAuthorMedians(ctx, row)
+		_, err := tx.ExecContext(ctx, updateAuthorMedians, row.postCount, row.medianInteractionCount, row.did);
 		if err != nil {
 			return err
 		}
@@ -155,12 +167,12 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	// 		time.Sleep(250 * time.Millisecond)
 	// 	}
 	// }
-	fmt.Println("Updating post counts")
-	err = ratios.UpdatePostCounts(ctx)
-	if err != nil {
-		return err
-	}
-	fmt.Println("Updated post counts")
+	// fmt.Println("Updating post counts")
+	// err = ratios.UpdatePostCounts(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+	// fmt.Println("Updated post counts")
 	err = ratios.RecalculateInteractionScores(ctx)
 	if err != nil {
 		return err
