@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -81,7 +82,46 @@ update "author" set postCount = (
 // 	console.log(`User Medians updated`);
 // }
 
-const medianUpdateSize = 250
+func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) error {
+	query := fmt.Sprintf(
+		"select author, 0, 0, 0, median(interactionCount) from post where author IN (%s) group by author",
+		"'"+strings.Join(batch, "','")+"'")
+	rows, err := ratios.database.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error calculating author stats: %s", err)
+	}
+	defer rows.Close()
+	toSave := make([]writeSchema.UpdateAuthorMediansParams, len(batch))
+	ind := 0
+	for rows.Next() {
+		row := toSave[ind]
+		err := rows.Scan(
+			&row.Did,
+			&row.MedianLikeCount,
+			&row.MedianReplyCount,
+			&row.MedianDirectReplyCount,
+			&row.MedianInteractionCount,
+		)
+		ind++
+		if err != nil {
+			return err
+		}
+	}
+
+	updates, tx, err := ratios.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, row := range toSave {
+		err = updates.UpdateAuthorMedians(ctx, row)
+		if err != nil {
+			return err
+		}
+	}
+	tx.Commit()
+	return nil
+}
 
 func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	ratios.batchMutex.Lock()
@@ -91,16 +131,30 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for ind, authorDid := range authors {
-		err = ratios.UpdateAllMediansForAuthor(ctx, authorDid)
+	fmt.Println("Updating author medians counts")
+	for i := 0; i < len(authors); i += 1000 {
+		start := time.Now()
+		batch := authors[i:]
+		if len(batch) > 1000 {
+			batch = batch[:1000]
+		}
+		err := ratios.updateAuthorBatch(ctx, batch)
 		if err != nil {
-			return err
+			return fmt.Errorf("error calculating author stats: %s", err)
 		}
-		if ind%1000 == 0 {
-			fmt.Printf("Updated %d author medians\n", ind)
-			time.Sleep(250 * time.Millisecond)
-		}
+		fmt.Printf("Updated %d author medians in %s\n", i+1000, time.Since(start))
+		// time.Sleep(200 * time.Millisecond)
 	}
+	// for ind, authorDid := range authors {
+	// 	err = ratios.UpdateAllMediansForAuthor(ctx, authorDid)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if ind%1000 == 0 {
+	// 		fmt.Printf("Updated %d author medians\n", ind)
+	// 		time.Sleep(250 * time.Millisecond)
+	// 	}
+	// }
 	fmt.Println("Updating post counts")
 	err = ratios.UpdatePostCounts(ctx)
 	if err != nil {
@@ -143,7 +197,7 @@ func (ratios *Ratios) UpdateAllMediansForAuthor(ctx context.Context, authorDid s
 	}
 
 	err = ratios.database.Updates.UpdateAuthorMedians(ctx, writeSchema.UpdateAuthorMediansParams{
-		Did: authorDid,
+		Did:                    authorDid,
 		MedianDirectReplyCount: median(directReplyCounts, 0),
 		MedianInteractionCount: median(interactionCounts, 0),
 		MedianLikeCount:        median(likeCounts, 0),
