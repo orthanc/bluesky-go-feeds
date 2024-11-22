@@ -46,7 +46,9 @@ where
 select
   "did"
 from
-  author;
+  author
+order by
+  hex (randomblob (16));
 
 -- name: ListAllFollowing :many
 select

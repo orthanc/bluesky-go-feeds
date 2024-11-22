@@ -124,6 +124,8 @@ select
   "did"
 from
   author
+order by
+  hex (randomblob (16))
 `
 
 func (q *Queries) ListAllAuthors(ctx context.Context) ([]string, error) {
