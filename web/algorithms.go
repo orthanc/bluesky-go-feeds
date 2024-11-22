@@ -11,13 +11,14 @@ import (
 type algorithm = func(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error)
 
 var algorithms = map[string]algorithm{
-	catchupAlgorithmId:          catchup,
-	catchupMutualsAlgorithmId:   catchupMutuals,
-	catchupFollowersAlgorithmId: catchupFollowers,
-	goodStuffAlgorithmId:        goodStuff,
-	loveliesAlgorithmId:         lovelies,
-	quietPostersAlgorithmId:     quietPosters,
-	youMightLikeAlgorithmId:     youMightLike,
-	followerRouletteAlgorithmId: followerRoulette,
-	debugAlgorithmId:            debugFeed,
+	catchupAlgorithmId:           catchup,
+	catchupMutualsAlgorithmId:    catchupMutuals,
+	catchupFollowersAlgorithmId:  catchupFollowers,
+	goodStuffAlgorithmId:         goodStuff,
+	loveliesAlgorithmId:          lovelies,
+	quietPostersAlgorithmId:      quietPosters,
+	youMightLikeAlgorithmId:      youMightLike,
+	followerRouletteAlgorithmId:  followerRoulette,
+	followingRouletteAlgorithmId: followingRoulette,
+	debugAlgorithmId:             debugFeed,
 }
