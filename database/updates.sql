@@ -261,16 +261,6 @@ insert into
 values
   (?, ?, ?, ?, ?) on conflict do nothing;
 
--- name: UpdateAuthorMedians :exec
-update author
-set
-  "medianReplyCount" = ?,
-  "medianDirectReplyCount" = ?,
-  "medianLikeCount" = ?,
-  "medianInteractionCount" = ?
-where
-  "did" = ?;
-
 -- name: DeleteAuthorsByDid :execrows
 delete from author
 where

@@ -744,36 +744,6 @@ func (q *Queries) SaveUserInteraction(ctx context.Context, arg SaveUserInteracti
 	return err
 }
 
-const updateAuthorMedians = `-- name: UpdateAuthorMedians :exec
-update author
-set
-  "medianReplyCount" = ?,
-  "medianDirectReplyCount" = ?,
-  "medianLikeCount" = ?,
-  "medianInteractionCount" = ?
-where
-  "did" = ?
-`
-
-type UpdateAuthorMediansParams struct {
-	MedianReplyCount       float64
-	MedianDirectReplyCount float64
-	MedianLikeCount        float64
-	MedianInteractionCount float64
-	Did                    string
-}
-
-func (q *Queries) UpdateAuthorMedians(ctx context.Context, arg UpdateAuthorMediansParams) error {
-	_, err := q.db.ExecContext(ctx, updateAuthorMedians,
-		arg.MedianReplyCount,
-		arg.MedianDirectReplyCount,
-		arg.MedianLikeCount,
-		arg.MedianInteractionCount,
-		arg.Did,
-	)
-	return err
-}
-
 const updateSessionLastSeen = `-- name: UpdateSessionLastSeen :exec
 update session
 set
