@@ -84,9 +84,9 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 				)
 				if lagTime > 60000 {
 					pauser.Pause()
-				} else {
+				} else if (lagTime < caughtUp) {
 					pauser.Unpause()
-				}
+				}	
 				windowStart = windowEnd
 				lastEvtTime = evtTime
 				eventCountSinceSync = 0
