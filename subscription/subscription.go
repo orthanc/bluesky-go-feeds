@@ -9,6 +9,7 @@ import (
 
 	"github.com/orthanc/feedgenerator/database"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
+	"github.com/orthanc/feedgenerator/pauser"
 
 	"github.com/bluesky-social/jetstream/pkg/client"
 	sequentiial "github.com/bluesky-social/jetstream/pkg/client/schedulers/sequential"
@@ -18,7 +19,7 @@ import (
 type JetstreamEventListener func(context.Context, *models.Event, string) error
 
 
-func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener) error {
+func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener, pauser *pauser.Pauser) error {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slog.LevelInfo,
 		AddSource: true,
@@ -81,6 +82,11 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 					time.Duration(lagTime)*time.Millisecond,
 					toCatchUp,
 				)
+				if lagTime > 60000 {
+					pauser.Pause()
+				} else {
+					pauser.Unpause()
+				}
 				windowStart = windowEnd
 				lastEvtTime = evtTime
 				eventCountSinceSync = 0

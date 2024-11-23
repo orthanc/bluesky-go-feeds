@@ -7,15 +7,18 @@ import (
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/pauser"
 )
 
 type Ratios struct {
-	database   *database.Database
+	database *database.Database
+	Pauser   *pauser.Pauser
 }
 
 func NewRatios(database *database.Database) *Ratios {
 	ratios := &Ratios{
-		database:   database,
+		database: database,
+		Pauser:   pauser.NewPauser(),
 	}
 	ctx := context.Background()
 
@@ -99,9 +102,9 @@ func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) ([]upd
 }
 
 type updateInteractionRationParam struct {
-	authorDid  string
-	userDid    string
-	score      float64
+	authorDid string
+	userDid   string
+	score     float64
 }
 
 func (ratios *Ratios) getInteractionRatiosToUpdate(ctx context.Context, authorDids []string) ([]updateInteractionRationParam, error) {
@@ -144,13 +147,13 @@ func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) err
 	}
 	defer tx.Rollback()
 	for _, row := range authorsToUpdate {
-		_, err := tx.ExecContext(ctx, updateAuthorMedians, row.postCount, row.medianInteractionCount, row.did);
+		_, err := tx.ExecContext(ctx, updateAuthorMedians, row.postCount, row.medianInteractionCount, row.did)
 		if err != nil {
 			return err
 		}
 	}
 	for _, row := range interactionRatiosToUpdate {
-		_, err := tx.ExecContext(ctx, updateInteractionRatio, row.score, row.authorDid, row.userDid);
+		_, err := tx.ExecContext(ctx, updateInteractionRatio, row.score, row.authorDid, row.userDid)
 		if err != nil {
 			return err
 		}
@@ -167,6 +170,7 @@ func (ratios *Ratios) UpdateAllRatios(ctx context.Context) error {
 	}
 	fmt.Println("Updating author medians counts")
 	for i := 0; i < len(authors); i += 1000 {
+		ratios.Pauser.Wait()
 		start := time.Now()
 		batch := authors[i:]
 		if len(batch) > 1000 {

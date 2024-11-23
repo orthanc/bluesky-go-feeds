@@ -55,7 +55,7 @@ func main() {
 		&publicClient,
 	)
 	allFollowing.Hydrate(ctx)
-	ratios.NewRatios(database)
+	ratioCalc := ratios.NewRatios(database)
 
 	go web.StartServer(database, allFollowing)
 	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
@@ -76,7 +76,7 @@ func main() {
 		AllFollowing: allFollowing,
 	}).Process
 	fmt.Println("Starting")
-	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners)
+	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser)
 	if err != nil {
 		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
 	}
