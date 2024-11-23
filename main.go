@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sync"
 
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
@@ -44,7 +43,6 @@ func main() {
 		return
 	}
 
-	batchMutex := &sync.Mutex{}
 	client := xrpc.Client{
 		Host: "https://bsky.social",
 	}
@@ -55,10 +53,9 @@ func main() {
 		database,
 		&client,
 		&publicClient,
-		batchMutex,
 	)
 	allFollowing.Hydrate(ctx)
-	ratios.NewRatios(database, batchMutex)
+	ratios.NewRatios(database)
 
 	go web.StartServer(database, allFollowing)
 	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
