@@ -72,7 +72,6 @@ func main() {
 	}).Process
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
 		Database:     database,
-		AllFollowing: allFollowing,
 	}).Process
 	fmt.Println("Starting")
 	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser)
