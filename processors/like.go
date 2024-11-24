@@ -9,12 +9,11 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/database/read"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
-	"github.com/orthanc/feedgenerator/following"
 )
 
 type LikeProcessor struct {
-	AllFollowing *following.AllFollowing
 	Database     *database.Database
 }
 
@@ -32,11 +31,17 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 
+		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{
+			PostAuthor: postAuthor,
+			LikeAuthor: event.Did,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to load like follow data %s", err)
+		}
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
-		if !(processor.AllFollowing.IsUser(postAuthor) ||
-			processor.AllFollowing.IsAuthor(postAuthor)) {
+		if !(interest.PostByUser > 0 || interest.PostByAuthor > 0) {
 			// ||
 			// authorIsFollowed) {
 			return nil
@@ -48,13 +53,13 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if processor.AllFollowing.IsAuthor(postAuthor) {
+		if interest.PostByAuthor > 0 {
 			err := updates.IncrementPostLike(ctx, postUri)
 			if err != nil {
 				return err
 			}
 
-			if processor.AllFollowing.IsUser(event.Did) && event.Did != postAuthor {
+			if interest.LikeByUser > 0 && event.Did != postAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: likeUri,
 					AuthorDid:      postAuthor,
@@ -68,7 +73,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 				}
 			}
 		}
-		if processor.AllFollowing.IsUser(postAuthor) {
+		if interest.PostByUser > 0 {
 			// Someone liking a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       likeUri,

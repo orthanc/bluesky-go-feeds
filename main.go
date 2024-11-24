@@ -54,7 +54,6 @@ func main() {
 		&client,
 		&publicClient,
 	)
-	allFollowing.Hydrate(ctx)
 	ratioCalc := ratios.NewRatios(database)
 
 	go web.StartServer(database, allFollowing)
@@ -65,15 +64,12 @@ func main() {
 	}).Process
 	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
 		Database:     database,
-		AllFollowing: allFollowing,
 	}).Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
 		Database:     database,
-		AllFollowing: allFollowing,
 	}).Process
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
 		Database:     database,
-		AllFollowing: allFollowing,
 	}).Process
 	fmt.Println("Starting")
 	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser)

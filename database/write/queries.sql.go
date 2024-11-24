@@ -44,6 +44,43 @@ func (q *Queries) GetCursor(ctx context.Context, service string) ([]SubState, er
 	return items, nil
 }
 
+const getFollowingFollowData = `-- name: GetFollowingFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as followed_by_user
+    where
+      followed_by_user."userDid" = ?1
+  ) as follow_by_user,
+  (
+    select
+      count(*)
+    from
+      user as following_user
+    where
+      following_user."userDid" = ?2
+  ) as following_user
+`
+
+type GetFollowingFollowDataParams struct {
+	FollowAuthor  string
+	FollowSubject string
+}
+
+type GetFollowingFollowDataRow struct {
+	FollowByUser  int64
+	FollowingUser int64
+}
+
+func (q *Queries) GetFollowingFollowData(ctx context.Context, arg GetFollowingFollowDataParams) (GetFollowingFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getFollowingFollowData, arg.FollowAuthor, arg.FollowSubject)
+	var i GetFollowingFollowDataRow
+	err := row.Scan(&i.FollowByUser, &i.FollowingUser)
+	return i, err
+}
+
 const getLastSession = `-- name: GetLastSession :many
 select
   sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
@@ -97,6 +134,52 @@ func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) 
 	return items, nil
 }
 
+const getLikeFollowData = `-- name: GetLikeFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as postUser
+    where
+      postUser."userDid" = ?1
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as likeUser
+    where
+      likeUser."userDid" = ?2
+  ) as like_by_user
+`
+
+type GetLikeFollowDataParams struct {
+	PostAuthor string
+	LikeAuthor string
+}
+
+type GetLikeFollowDataRow struct {
+	PostByUser   int64
+	PostByAuthor int64
+	LikeByUser   int64
+}
+
+func (q *Queries) GetLikeFollowData(ctx context.Context, arg GetLikeFollowDataParams) (GetLikeFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getLikeFollowData, arg.PostAuthor, arg.LikeAuthor)
+	var i GetLikeFollowDataRow
+	err := row.Scan(&i.PostByUser, &i.PostByAuthor, &i.LikeByUser)
+	return i, err
+}
+
 const getPostDates = `-- name: GetPostDates :one
 select
   "indexedAt",
@@ -116,6 +199,87 @@ func (q *Queries) GetPostDates(ctx context.Context, uri string) (GetPostDatesRow
 	row := q.db.QueryRowContext(ctx, getPostDates, uri)
 	var i GetPostDatesRow
 	err := row.Scan(&i.IndexedAt, &i.CreatedAt)
+	return i, err
+}
+
+const getPostFollowData = `-- name: GetPostFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      author as post_author
+    where
+      post_author.did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as post_user
+    where
+      post_user.userDid = ?1
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_parent_author
+    where
+      reply_parent_author.did = ?2
+  ) as reply_to_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_parent_user
+    where
+      reply_parent_user.userDid = ?2
+  ) as reply_to_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_root_author
+    where
+      reply_root_author.did = ?3
+  ) as reply_to_thread_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_root_user
+    where
+      reply_root_user.userDid = ?3
+  ) as reply_to_thread_user
+`
+
+type GetPostFollowDataParams struct {
+	PostAuthor        string
+	ReplyParentAuthor string
+	ReplyRootAuthor   string
+}
+
+type GetPostFollowDataRow struct {
+	PostByAuthor        int64
+	PostByUser          int64
+	ReplyToAuthor       int64
+	ReplyToUser         int64
+	ReplyToThreadAuthor int64
+	ReplyToThreadUser   int64
+}
+
+func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataParams) (GetPostFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getPostFollowData, arg.PostAuthor, arg.ReplyParentAuthor, arg.ReplyRootAuthor)
+	var i GetPostFollowDataRow
+	err := row.Scan(
+		&i.PostByAuthor,
+		&i.PostByUser,
+		&i.ReplyToAuthor,
+		&i.ReplyToUser,
+		&i.ReplyToThreadAuthor,
+		&i.ReplyToThreadUser,
+	)
 	return i, err
 }
 

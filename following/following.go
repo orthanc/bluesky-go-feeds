@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"slices"
-	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -23,11 +21,6 @@ type AllFollowing struct {
 	database     *database.Database
 	client       *xrpc.Client
 	publicClient *xrpc.Client
-
-	userDids         sync.Map
-	followingRecords sync.Map
-	followedBy       sync.Map
-	followers        sync.Map
 }
 
 var emptyFollowedBy []string
@@ -56,135 +49,6 @@ func NewAllFollowing(database *database.Database, client *xrpc.Client, publicCli
 	return allFollowing
 }
 
-func (allFollowing *AllFollowing) IsUser(userDid string) bool {
-	value, present := allFollowing.userDids.Load(userDid)
-	return present && value.(bool)
-}
-
-func (allFollowing *AllFollowing) IsFollowed(authorDid string) bool {
-	value, _ := allFollowing.followedBy.Load(authorDid)
-	return value != nil
-}
-
-func (allFollowing *AllFollowing) IsFollower(authorDid string) bool {
-	value, _ := allFollowing.followers.Load(authorDid)
-	return value != nil
-}
-
-func (allFollowing *AllFollowing) IsAuthor(authorDid string) bool {
-	return allFollowing.IsFollowed(authorDid) || allFollowing.IsFollower(authorDid)
-}
-
-func (allFollowing *AllFollowing) FollowedBy(authorDid string) []string {
-	value, _ := allFollowing.followedBy.Load(authorDid)
-	if value == nil {
-		return emptyFollowedBy
-	}
-	return *value.(*[]string)
-}
-
-func (allFollowing *AllFollowing) addFollowData(record schema.Following) {
-	_, loaded := allFollowing.followingRecords.Swap(record.Uri, record)
-	if loaded {
-		return
-	}
-	for {
-		current, _ := allFollowing.followedBy.LoadOrStore(record.Following, &emptyFollowedBy)
-		updated := append(slices.Clone(*current.(*[]string)), record.FollowedBy)
-		swapped := allFollowing.followedBy.CompareAndSwap(record.Following, current, &updated)
-		if swapped {
-			break
-		}
-	}
-}
-
-func (allFollowing *AllFollowing) removeFollowData(uri string) (schema.Following, bool) {
-	value, loaded := allFollowing.followingRecords.LoadAndDelete(uri)
-	if !loaded {
-		return schema.Following{}, false
-	}
-	record := value.(schema.Following)
-	for {
-		current, _ := allFollowing.followedBy.Load(record.Following)
-		if current == nil {
-			break
-		}
-		newVal := slices.Clone(*current.(*[]string))
-		newVal = slices.DeleteFunc(newVal, func(e string) bool { return e == record.FollowedBy })
-		if len(newVal) > 0 {
-			swapped := allFollowing.followedBy.CompareAndSwap(record.Following, current, &newVal)
-			if swapped {
-				break
-			}
-		} else {
-			deleted := allFollowing.followedBy.CompareAndDelete(record.Following, current)
-			if deleted {
-				break
-			}
-		}
-	}
-	return record, loaded
-}
-
-func (allFollowing *AllFollowing) addFollowerData(record schema.Follower) {
-	for {
-		current, _ := allFollowing.followers.LoadOrStore(record.FollowedBy, &emptyFollowedBy)
-		updated := append(slices.Clone(*current.(*[]string)), record.Following)
-		swapped := allFollowing.followers.CompareAndSwap(record.FollowedBy, current, &updated)
-		if swapped {
-			break
-		}
-	}
-}
-
-func (allFollowing *AllFollowing) removeFollowerData(following string, followedBy string) bool {
-	for {
-		current, _ := allFollowing.followers.Load(followedBy)
-		if current == nil || slices.Index(*current.(*[]string), following) == -1 {
-			return false
-		}
-		newVal := slices.Clone(*current.(*[]string))
-		newVal = slices.DeleteFunc(newVal, func(e string) bool { return e == following })
-		if len(newVal) > 0 {
-			swapped := allFollowing.followers.CompareAndSwap(followedBy, current, &newVal)
-			if swapped {
-				return true
-			}
-		} else {
-			deleted := allFollowing.followers.CompareAndDelete(followedBy, current)
-			if deleted {
-				return true
-			}
-		}
-	}
-}
-
-func (allFollowing *AllFollowing) Hydrate(ctx context.Context) {
-	userDids, err := allFollowing.database.Queries.ListAllUsers(ctx)
-	if err != nil {
-		panic(err)
-	}
-	for _, userDid := range userDids {
-		allFollowing.userDids.Store(userDid, true)
-	}
-
-	followingRecords, err := allFollowing.database.Queries.ListAllFollowing(ctx)
-	if err != nil {
-		panic(err)
-	}
-	for _, followingRecord := range followingRecords {
-		allFollowing.addFollowData(followingRecord)
-	}
-
-	followerRecords, err := allFollowing.database.Queries.ListAllFollowers(ctx)
-	if err != nil {
-		panic(err)
-	}
-	for _, followerRecord := range followerRecords {
-		allFollowing.addFollowerData(followerRecord)
-	}
-}
-
 func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records []schema.Following) error {
 	updates, tx, err := allFollowing.database.BeginTx(ctx)
 	if err != nil {
@@ -193,16 +57,6 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 	defer tx.Rollback()
 
 	for _, record := range records {
-		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams{
-			Uri:                  record.Uri,
-			FollowedBy:           record.FollowedBy,
-			Following:            record.Following,
-			UserInteractionRatio: record.UserInteractionRatio,
-			LastRecorded:         record.LastRecorded,
-		}); err != nil {
-			return err
-		}
-
 		author := writeSchema.SaveAuthorParams{
 			Did:                    record.Following,
 			MedianDirectReplyCount: 0,
@@ -214,7 +68,15 @@ func (allFollowing *AllFollowing) saveFollowingPage(ctx context.Context, records
 			return err
 		}
 
-		allFollowing.addFollowData(record)
+		if err := updates.SaveFollowing(ctx, writeSchema.SaveFollowingParams{
+			Uri:                  record.Uri,
+			FollowedBy:           record.FollowedBy,
+			Following:            record.Following,
+			UserInteractionRatio: record.UserInteractionRatio,
+			LastRecorded:         record.LastRecorded,
+		}); err != nil {
+			return err
+		}
 	}
 
 	err = tx.Commit()
@@ -244,7 +106,6 @@ func (allFollowing *AllFollowing) removeFollowingNotRecordedAfter(ctx context.Co
 		if err != nil {
 			return err
 		}
-		allFollowing.removeFollowData(following.Uri)
 	}
 	tx.Commit()
 	return nil
@@ -259,7 +120,6 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 	if err := allFollowing.database.Updates.SaveUser(ctx, user); err != nil {
 		return err
 	}
-	allFollowing.userDids.Store(user.UserDid, true)
 
 	syncStart := time.Now().UTC().Format(time.RFC3339)
 	follows := make([]schema.Following, 0, 100)
@@ -344,12 +204,9 @@ func (allFollowing *AllFollowing) RecordFollow(ctx context.Context, uri string, 
 }
 
 func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) error {
-	_, ok := allFollowing.removeFollowData(uri)
-	if ok {
-		err := allFollowing.database.Updates.DeleteFollowing(ctx, uri)
-		if err != nil {
-			return err
-		}
+	err := allFollowing.database.Updates.DeleteFollowing(ctx, uri)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -372,14 +229,6 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 	defer tx.Rollback()
 
 	for _, record := range records {
-		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
-			FollowedBy:   record.FollowedBy,
-			Following:    record.Following,
-			LastRecorded: record.LastRecorded,
-		}); err != nil {
-			return err
-		}
-
 		author := writeSchema.SaveAuthorParams{
 			Did:                    record.FollowedBy,
 			MedianDirectReplyCount: 0,
@@ -391,7 +240,13 @@ func (allFollowing *AllFollowing) saveFollowerPage(ctx context.Context, records 
 			return err
 		}
 
-		allFollowing.addFollowerData(record)
+		if err := updates.SaveFollower(ctx, writeSchema.SaveFollowerParams{
+			FollowedBy:   record.FollowedBy,
+			Following:    record.Following,
+			LastRecorded: record.LastRecorded,
+		}); err != nil {
+			return err
+		}
 	}
 
 	err = tx.Commit()
@@ -425,60 +280,18 @@ func (allFollowing *AllFollowing) removeFollowersNotRecordedAfter(ctx context.Co
 		if err != nil {
 			return err
 		}
-		allFollowing.removeFollowerData(follower.Following, follower.FollowedBy)
 	}
 	tx.Commit()
 	return nil
 }
 
 func (allFollowing *AllFollowing) purgeUser(ctx context.Context, userDid string, purgeBefore string) error {
-	updates, tx, err := allFollowing.database.BeginTx(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if rows, err := updates.DeleteUserWhenNotSeen(ctx, writeSchema.DeleteUserWhenNotSeenParams{
+	if _, err := allFollowing.database.Updates.DeleteUserWhenNotSeen(ctx, writeSchema.DeleteUserWhenNotSeenParams{
 		UserDid:     userDid,
 		PurgeBefore: purgeBefore,
 	}); err != nil {
 		return fmt.Errorf("error deleting user %s: %w", userDid, err)
-	} else if rows == 0 {
-		// If user wasn't deleted they were seen since we listed them
-		// so just return with no action
-		return nil
 	}
-
-	allFollowing.userDids.Delete(userDid)
-	var authorsToDelete []string
-	allFollowing.followingRecords.Range(func(key any, value any) bool {
-		following := value.(schema.Following)
-		if following.FollowedBy == userDid {
-			allFollowing.removeFollowData(following.Uri)
-			if !allFollowing.IsAuthor(following.Following) {
-				authorsToDelete = append(authorsToDelete, following.Following)
-			}
-		}
-		return true
-	})
-	allFollowing.followers.Range(func(key any, value any) bool {
-		followedBy := key.(string)
-		removed := allFollowing.removeFollowerData(userDid, followedBy)
-		if removed && !allFollowing.IsAuthor(followedBy) {
-			authorsToDelete = append(authorsToDelete, followedBy)
-		}
-		return true
-	})
-	for start := 0; start < len(authorsToDelete); {
-		end := min(start+1000, len(authorsToDelete))
-		batch := authorsToDelete[start:end]
-		if _, err := updates.DeleteAuthorsByDid(ctx, batch); err != nil {
-			return fmt.Errorf("error deleting authors now unused by user %s: %w", userDid, err)
-		}
-		start = end
-	}
-
-	tx.Commit()
 	fmt.Printf("Deleted user %s\n", userDid)
 	return nil
 }

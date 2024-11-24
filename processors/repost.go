@@ -8,11 +8,10 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
-	"github.com/orthanc/feedgenerator/following"
+	"github.com/orthanc/feedgenerator/database/read"
 )
 
 type RepostProcessor struct {
-	AllFollowing *following.AllFollowing
 	Database     *database.Database
 }
 
@@ -30,10 +29,17 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			return nil
 		}
 
-		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
+		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{
+			PostAuthor: postAuthor,
+			LikeAuthor: event.Did,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to load like follow data %s", err)
+		}
+		// Quick return for reposts that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
-		if !(processor.AllFollowing.IsAuthor(postAuthor)) { 
+		if !(interest.PostByAuthor > 0) { 
 			// ||
 			// authorIsFollowed) {
 			return nil
@@ -45,7 +51,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 		}
 		defer tx.Rollback()
 		// indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if processor.AllFollowing.IsAuthor(postAuthor) {
+		if interest.PostByAuthor > 0 {
 			err := updates.IncrementPostRepost(ctx, postUri)
 			if err != nil {
 				return err
