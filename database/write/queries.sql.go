@@ -44,6 +44,43 @@ func (q *Queries) GetCursor(ctx context.Context, service string) ([]SubState, er
 	return items, nil
 }
 
+const getFollowingFollowData = `-- name: GetFollowingFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as followed_by_user
+    where
+      followed_by_user."userDid" = ?1
+  ) as follow_by_user,
+  (
+    select
+      count(*)
+    from
+      user as following_user
+    where
+      following_user."userDid" = ?2
+  ) as following_user
+`
+
+type GetFollowingFollowDataParams struct {
+	FollowAuthor  string
+	FollowSubject string
+}
+
+type GetFollowingFollowDataRow struct {
+	FollowByUser  int64
+	FollowingUser int64
+}
+
+func (q *Queries) GetFollowingFollowData(ctx context.Context, arg GetFollowingFollowDataParams) (GetFollowingFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getFollowingFollowData, arg.FollowAuthor, arg.FollowSubject)
+	var i GetFollowingFollowDataRow
+	err := row.Scan(&i.FollowByUser, &i.FollowingUser)
+	return i, err
+}
+
 const getLastSession = `-- name: GetLastSession :many
 select
   sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo

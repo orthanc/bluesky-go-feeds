@@ -8,6 +8,7 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/database/read"
 	"github.com/orthanc/feedgenerator/following"
 )
 
@@ -25,20 +26,34 @@ func (processor *FollowProcessor) Process(ctx context.Context, event *models.Eve
 			return nil
 		}
 		subject := follow.Subject
-		if processor.AllFollowing.IsUser(event.Did) {
+		interest, err := processor.Database.Queries.GetFollowingFollowData(ctx, read.GetFollowingFollowDataParams{
+			FollowAuthor: event.Did,
+			FollowSubject: subject,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to load follow follow data %s", err)
+		}
+		if interest.FollowByUser > 0 {
 			err := processor.AllFollowing.RecordFollow(ctx, followUri, event.Did, subject)
 			if err != nil {
 				return err
 			}
 		}
-		if processor.AllFollowing.IsUser(subject) {
+		if interest.FollowingUser > 0 {
 			err := processor.AllFollowing.RecordFollower(ctx, followUri, subject, event.Did)
 			if err != nil {
 				return err
 			}
 		}
 	case models.CommitOperationDelete:
-		if processor.AllFollowing.IsUser(event.Did) {
+		interest, err := processor.Database.Queries.GetFollowingFollowData(ctx, read.GetFollowingFollowDataParams{
+			FollowAuthor: event.Did,
+			FollowSubject: event.Did,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to load follow follow data %s", err)
+		}
+		if interest.FollowByUser > 0 {
 			return processor.AllFollowing.RemoveFollow(ctx, followUri)
 		}
 	}
