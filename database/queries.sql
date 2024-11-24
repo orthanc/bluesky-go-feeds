@@ -101,3 +101,30 @@ where
     last_recorded is NULL
     or last_recorded < ?
   );
+
+-- name: GetLikeFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as postUser
+    where
+      postUser."userDid" = sqlc.arg (post_author)
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      did = sqlc.arg (post_author)
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as likeUser
+    where
+      likeUser."userDid" = sqlc.arg (like_author)
+  ) as like_by_user;

@@ -97,6 +97,52 @@ func (q *Queries) GetLastSession(ctx context.Context, arg GetLastSessionParams) 
 	return items, nil
 }
 
+const getLikeFollowData = `-- name: GetLikeFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as postUser
+    where
+      postUser."userDid" = ?1
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as likeUser
+    where
+      likeUser."userDid" = ?2
+  ) as like_by_user
+`
+
+type GetLikeFollowDataParams struct {
+	PostAuthor string
+	LikeAuthor string
+}
+
+type GetLikeFollowDataRow struct {
+	PostByUser   int64
+	PostByAuthor int64
+	LikeByUser   int64
+}
+
+func (q *Queries) GetLikeFollowData(ctx context.Context, arg GetLikeFollowDataParams) (GetLikeFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getLikeFollowData, arg.PostAuthor, arg.LikeAuthor)
+	var i GetLikeFollowDataRow
+	err := row.Scan(&i.PostByUser, &i.PostByAuthor, &i.LikeByUser)
+	return i, err
+}
+
 const getPostDates = `-- name: GetPostDates :one
 select
   "indexedAt",
