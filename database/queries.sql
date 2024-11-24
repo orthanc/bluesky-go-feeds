@@ -128,3 +128,54 @@ select
     where
       likeUser."userDid" = sqlc.arg (like_author)
   ) as like_by_user;
+
+-- name: GetPostFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      author as post_author
+    where
+      post_author.did = sqlc.arg (post_author)
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as post_user
+    where
+      post_user.userDid = sqlc.arg (post_author)
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_parent_author
+    where
+      reply_parent_author.did = sqlc.arg (reply_parent_author)
+  ) as reply_to_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_parent_user
+    where
+      reply_parent_user.userDid = sqlc.arg (reply_parent_author)
+  ) as reply_to_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_root_author
+    where
+      reply_root_author.did = sqlc.arg (reply_root_author)
+  ) as reply_to_thread_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_root_user
+    where
+      reply_root_user.userDid = sqlc.arg (reply_root_author)
+  ) as reply_to_thread_user;

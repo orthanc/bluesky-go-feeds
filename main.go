@@ -65,7 +65,6 @@ func main() {
 	}).Process
 	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
 		Database:     database,
-		AllFollowing: allFollowing,
 	}).Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
 		Database:     database,

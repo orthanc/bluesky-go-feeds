@@ -165,6 +165,87 @@ func (q *Queries) GetPostDates(ctx context.Context, uri string) (GetPostDatesRow
 	return i, err
 }
 
+const getPostFollowData = `-- name: GetPostFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      author as post_author
+    where
+      post_author.did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as post_user
+    where
+      post_user.userDid = ?1
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_parent_author
+    where
+      reply_parent_author.did = ?2
+  ) as reply_to_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_parent_user
+    where
+      reply_parent_user.userDid = ?2
+  ) as reply_to_user,
+  (
+    select
+      count(*)
+    from
+      author as reply_root_author
+    where
+      reply_root_author.did = ?3
+  ) as reply_to_thread_author,
+  (
+    select
+      count(*)
+    from
+      user as reply_root_user
+    where
+      reply_root_user.userDid = ?3
+  ) as reply_to_thread_user
+`
+
+type GetPostFollowDataParams struct {
+	PostAuthor        string
+	ReplyParentAuthor string
+	ReplyRootAuthor   string
+}
+
+type GetPostFollowDataRow struct {
+	PostByAuthor        int64
+	PostByUser          int64
+	ReplyToAuthor       int64
+	ReplyToUser         int64
+	ReplyToThreadAuthor int64
+	ReplyToThreadUser   int64
+}
+
+func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataParams) (GetPostFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getPostFollowData, arg.PostAuthor, arg.ReplyParentAuthor, arg.ReplyRootAuthor)
+	var i GetPostFollowDataRow
+	err := row.Scan(
+		&i.PostByAuthor,
+		&i.PostByUser,
+		&i.ReplyToAuthor,
+		&i.ReplyToUser,
+		&i.ReplyToThreadAuthor,
+		&i.ReplyToThreadUser,
+	)
+	return i, err
+}
+
 const listAllAuthors = `-- name: ListAllAuthors :many
 select
   "did"

@@ -9,12 +9,11 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/database/read"
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
-	"github.com/orthanc/feedgenerator/following"
 )
 
 type PostProcessor struct {
-	AllFollowing *following.AllFollowing
 	Database     *database.Database
 }
 
@@ -39,13 +38,22 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			}
 		}
 
+		interest, err := processor.Database.Queries.GetPostFollowData(ctx, read.GetPostFollowDataParams{
+			PostAuthor: event.Did,
+			ReplyParentAuthor: replyParentAuthor,
+			ReplyRootAuthor: replyRootAuthor,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to load post follow data %s", err)
+		}
+
 		// Quick return for posts that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
-		if !(processor.AllFollowing.IsAuthor(event.Did) ||
-			processor.AllFollowing.IsAuthor(replyParentAuthor) ||
-			processor.AllFollowing.IsUser(replyParentAuthor) ||
-			processor.AllFollowing.IsAuthor(replyRootAuthor) ||
-			processor.AllFollowing.IsUser(replyRootAuthor)) {
+		if !(interest.PostByAuthor > 0 ||
+			interest.ReplyToAuthor > 0 ||
+			interest.ReplyToUser > 0 ||
+			interest.ReplyToThreadAuthor > 0 ||
+			interest.ReplyToThreadUser > 0) {
 			return nil
 		}
 		now := time.Now().UTC().Add(time.Minute)
@@ -70,7 +78,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 		indexedAt := indexAsDate.Format(time.RFC3339)
-		if processor.AllFollowing.IsAuthor(event.Did) {
+		if interest.PostByAuthor > 0 {
 			postIndexedAt := indexAsDate
 			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
@@ -129,13 +137,13 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			// 	}
 			// }
 		}
-		if processor.AllFollowing.IsAuthor(replyParentAuthor) {
+		if interest.ReplyToAuthor > 0 {
 			err := updates.IncrementPostDirectReply(ctx, postUri)
 			if err != nil {
 				return err
 			}
 
-			if processor.AllFollowing.IsUser(event.Did) && event.Did != replyParentAuthor {
+			if interest.PostByUser > 0 && event.Did != replyParentAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: postUri,
 					AuthorDid:      replyParentAuthor,
@@ -149,7 +157,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 				}
 			}
 		}
-		if processor.AllFollowing.IsUser(replyParentAuthor) && event.Did != replyParentAuthor {
+		if interest.ReplyToUser > 0 && event.Did != replyParentAuthor {
 			// Someone replying a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       postUri,
@@ -167,13 +175,13 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		// We don't want to double process direct replies so everything after this only applies if
 		// the reply parent and reply root are different
 		if replyParent != replyRoot {
-			if processor.AllFollowing.IsAuthor(replyRootAuthor) {
+			if interest.ReplyToThreadAuthor > 0 {
 				err := updates.IncrementPostIndirectReply(ctx, postUri)
 				if err != nil {
 					return err
 				}
 
-				if processor.AllFollowing.IsUser(event.Did) && event.Did != replyRootAuthor {
+				if interest.PostByUser > 0 && event.Did != replyRootAuthor {
 					err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 						InteractionUri: postUri,
 						AuthorDid:      replyRootAuthor,
@@ -187,7 +195,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 					}
 				}
 			}
-			if processor.AllFollowing.IsUser(replyRootAuthor) && event.Did != replyRootAuthor {
+			if interest.ReplyToThreadUser > 0 && event.Did != replyRootAuthor {
 				// Someone replying a post by one of the users
 				err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 					InteractionUri:       postUri,
