@@ -54,7 +54,6 @@ func main() {
 		&client,
 		&publicClient,
 	)
-	allFollowing.Hydrate(ctx)
 	ratioCalc := ratios.NewRatios(database)
 
 	go web.StartServer(database, allFollowing)
