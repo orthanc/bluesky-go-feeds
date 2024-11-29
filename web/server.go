@@ -9,6 +9,7 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/following"
+	"github.com/orthanc/feedgenerator/subscription"
 )
 
 func wellKnownDidHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,11 @@ func describeFeedGenerator(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func StartServer(database *database.Database, following *following.AllFollowing) {
+func StartServer(database *database.Database, following *following.AllFollowing, processingStats *subscription.ProcessingStats) {
+	statusPage := StatusPage{
+		processingStats: processingStats,
+	}
+	http.HandleFunc("GET /status", statusPage.ServeHTTP)
 	http.HandleFunc("GET /.well-known/did.json", wellKnownDidHandler)
 	http.HandleFunc("GET /xrpc/app.bsky.feed.describeFeedGenerator", describeFeedGenerator)
 	http.Handle("GET /xrpc/app.bsky.feed.getFeedSkeleton", NewGetFeedSkeleton(database, following))

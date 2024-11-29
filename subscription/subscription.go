@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
@@ -18,8 +19,51 @@ import (
 
 type JetstreamEventListener func(context.Context, *models.Event, string) error
 
+type ProcessingRun struct {
+	Timestamp time.Time
+	Events int
+	ProcessingTime time.Duration
+	EventsPerSecond float64
+	LastEventTime time.Time
+	CaughtUp time.Duration
+	LagTime time.Duration
+	ToCatchUp time.Duration
+}
 
-func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener, pauser *pauser.Pauser) error {
+type ProcessingStats struct {
+	runs [3000]ProcessingRun
+	end int
+	start int
+	lock *sync.RWMutex
+}
+
+func NewProcessingStats() *ProcessingStats {
+	var lock sync.RWMutex
+	return &ProcessingStats{
+		lock: &lock,
+	}
+}
+
+func (status *ProcessingStats) Push(run *ProcessingRun) {
+	status.lock.Lock()
+	defer status.lock.Unlock()
+	status.runs[status.end] = *run
+	status.end = (status.end + 1) % len(status.runs)
+	if status.start == status.end {
+		status.start = (status.end + 1) % len(status.runs)
+	}
+}
+
+func (status *ProcessingStats) Iterate(cb func (run *ProcessingRun)) {
+	status.lock.RLock()
+	defer status.lock.RUnlock()
+	for i := status.start; i != status.end; i = (i + 1) % len(status.runs) {
+		cb(&status.runs[i])
+	}
+}
+
+
+func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener, pauser *pauser.Pauser, stats *ProcessingStats) error {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slog.LevelInfo,
 		AddSource: true,
@@ -62,7 +106,8 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 					Service: "jetstream",
 					Cursor:  event.TimeUS,
 				})
-				windowEnd := time.Now().UTC().UnixMilli()
+				now := time.Now().UTC()
+				windowEnd := now.UnixMilli()
 				timeSpent := windowEnd - windowStart
 				parsedTime := time.UnixMicro(event.TimeUS)
 				evtTime := parsedTime.UnixMilli()
@@ -72,16 +117,27 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 				if lagTime > caughtUp {
 					toCatchUp = time.Duration(timeSpent*lagTime/caughtUp) * time.Millisecond
 				}
+				eventStats := ProcessingRun{
+					Timestamp: now,
+					Events: eventCountSinceSync,
+					ProcessingTime:time.Duration(timeSpent)*time.Millisecond,
+					EventsPerSecond: 1000.0*float64(eventCountSinceSync)/float64(timeSpent),
+					LastEventTime: parsedTime,
+					CaughtUp: time.Duration(caughtUp)*time.Millisecond,
+					LagTime: time.Duration(lagTime)*time.Millisecond,
+					ToCatchUp: toCatchUp,
+				}
 				fmt.Printf(
 					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up)\n",
-					eventCountSinceSync,
-					time.Duration(timeSpent)*time.Millisecond,
-					1000.0*float64(eventCountSinceSync)/float64(timeSpent),
-					parsedTime.Format(time.RFC3339),
-					time.Duration(caughtUp)*time.Millisecond,
-					time.Duration(lagTime)*time.Millisecond,
+					eventStats.Events,
+					eventStats.ProcessingTime,
+					eventStats.EventsPerSecond,
+					eventStats.LastEventTime.Format(time.RFC3339),
+					eventStats.CaughtUp,
+					eventStats.LagTime,
 					toCatchUp,
 				)
+				stats.Push(&eventStats)
 				if lagTime > 60000 {
 					pauser.Pause()
 				} else if (lagTime < 15000) {

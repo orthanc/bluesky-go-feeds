@@ -56,7 +56,8 @@ func main() {
 	)
 	ratioCalc := ratios.NewRatios(database)
 
-	go web.StartServer(database, allFollowing)
+	processingStats := subscription.NewProcessingStats()
+	go web.StartServer(database, allFollowing, processingStats)
 	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{
 		Database:     database,
@@ -72,7 +73,7 @@ func main() {
 		Database:     database,
 	}).Process
 	fmt.Println("Starting")
-	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser)
+	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser, processingStats)
 	if err != nil {
 		panic(fmt.Sprintf("subscribing to firehose failed (dialing): %s", err))
 	}
