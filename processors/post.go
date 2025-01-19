@@ -57,12 +57,14 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 		now := time.Now().UTC().Add(time.Minute)
+		indexAsDate := now
 		rawCreatedAt := post.CreatedAt
 		createdAt, err := time.Parse(time.RFC3339, rawCreatedAt)
 		if err != nil {
-			return err
+			fmt.Printf("Ignoring unparsable create date %s on post by %s, using %s instead\n", rawCreatedAt, event.Did, now)
+			indexAsDate = now
 		}
-		indexAsDate := createdAt.UTC();
+		indexAsDate = createdAt.UTC();
 		if now.Before(indexAsDate) {
 			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Did, now)
 			indexAsDate = now
