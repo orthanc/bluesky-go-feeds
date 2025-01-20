@@ -283,6 +283,28 @@ func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataPa
 	return i, err
 }
 
+const isOnList = `-- name: IsOnList :one
+select
+  count(*)
+from
+  list_membership
+where
+  list_uri = ?
+  and member_did = ?
+`
+
+type IsOnListParams struct {
+	ListUri   string
+	MemberDid string
+}
+
+func (q *Queries) IsOnList(ctx context.Context, arg IsOnListParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, isOnList, arg.ListUri, arg.MemberDid)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const listAllAuthors = `-- name: ListAllAuthors :many
 select
   "did"

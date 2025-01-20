@@ -93,6 +93,23 @@ func (q *Queries) DeleteInteractionWithUsersBefore(ctx context.Context, arg Dele
 	return result.RowsAffected()
 }
 
+const deleteListMembershipNotRecordedBefore = `-- name: DeleteListMembershipNotRecordedBefore :exec
+delete from list_membership
+where
+  list_uri = ?
+  and last_recorded < ?
+`
+
+type DeleteListMembershipNotRecordedBeforeParams struct {
+	ListUri      string
+	LastRecorded string
+}
+
+func (q *Queries) DeleteListMembershipNotRecordedBefore(ctx context.Context, arg DeleteListMembershipNotRecordedBeforeParams) error {
+	_, err := q.db.ExecContext(ctx, deleteListMembershipNotRecordedBefore, arg.ListUri, arg.LastRecorded)
+	return err
+}
+
 const deletePostInteractedByFollowedBefore = `-- name: DeletePostInteractedByFollowedBefore :execrows
 delete from post_interacted_by_followed
 where
@@ -450,6 +467,27 @@ func (q *Queries) SaveInteractionWithUser(ctx context.Context, arg SaveInteracti
 		arg.PostUri,
 		arg.IndexedAt,
 	)
+	return err
+}
+
+const saveListMembership = `-- name: SaveListMembership :exec
+insert into
+  list_membership (list_uri, member_did, last_recorded)
+values
+  (?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded
+`
+
+type SaveListMembershipParams struct {
+	ListUri      string
+	MemberDid    string
+	LastRecorded string
+}
+
+func (q *Queries) SaveListMembership(ctx context.Context, arg SaveListMembershipParams) error {
+	_, err := q.db.ExecContext(ctx, saveListMembership, arg.ListUri, arg.MemberDid, arg.LastRecorded)
 	return err
 }
 

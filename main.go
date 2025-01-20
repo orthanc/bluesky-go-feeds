@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
@@ -49,12 +50,27 @@ func main() {
 	publicClient := xrpc.Client{
 		Host: "https://public.api.bsky.app",
 	}
+	followFarmersList := os.Getenv("FOLLOW_FARMERS_LIST")
 	allFollowing := following.NewAllFollowing(
 		database,
 		&client,
 		&publicClient,
+		followFarmersList,
 	)
 	ratioCalc := ratios.NewRatios(database)
+	go func() {
+		err := allFollowing.SyncList(ctx, followFarmersList)
+		if err != nil {
+			fmt.Println(err)
+		}
+		ticker := time.NewTicker(6 * time.Hour)
+		for range ticker.C {
+			err := allFollowing.SyncList(ctx, followFarmersList)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}()
 
 	processingStats := subscription.NewProcessingStats()
 	go web.StartServer(database, allFollowing, processingStats)
@@ -72,6 +88,7 @@ func main() {
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
 		Database:     database,
 	}).Process
+	firehoseListeners["app.bsky.graph.listitem"] = processor.NewListItemProcessor(database, followFarmersList ).Process
 	fmt.Println("Starting")
 	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser, processingStats)
 	if err != nil {

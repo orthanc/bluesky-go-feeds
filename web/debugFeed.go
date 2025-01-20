@@ -11,9 +11,9 @@ import (
 )
 
 type debugQueryRow = struct {
-	Uri                  string
-	IndexedAt            string
-	Author               string
+	Uri       string
+	IndexedAt string
+	Author    string
 }
 
 const debugAlgorithmId = "replies-foll"

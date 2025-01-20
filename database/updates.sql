@@ -339,3 +339,18 @@ set
   indexed_at = excluded.indexed_at,
   followed_repost_count = followed_repost_count + 1,
   followed_interaction_count = followed_interaction_count + 1;
+
+-- name: SaveListMembership :exec
+insert into
+  list_membership (list_uri, member_did, last_recorded)
+values
+  (?, ?, ?) on conflict do
+update
+set
+  last_recorded = excluded.last_recorded;
+
+-- name: DeleteListMembershipNotRecordedBefore :exec
+delete from list_membership
+where
+  list_uri = ?
+  and last_recorded < ?;

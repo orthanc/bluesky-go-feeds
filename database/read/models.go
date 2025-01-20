@@ -15,6 +15,8 @@ type Author struct {
 	MedianDirectReplyCount float64
 	MedianInteractionCount float64
 	PostCount              sql.NullFloat64
+	FollowedByCount        float64
+	FollowingCount         float64
 }
 
 type FollowedInteraction struct {
@@ -49,6 +51,12 @@ type InteractionWithUser struct {
 	InteractionAuthorDid string
 	PostUri              string
 	IndexedAt            string
+}
+
+type ListMembership struct {
+	ListUri      string
+	MemberDid    string
+	LastRecorded string
 }
 
 type Post struct {

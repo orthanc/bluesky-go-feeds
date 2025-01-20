@@ -198,3 +198,12 @@ select
     where
       following_user."userDid" = sqlc.arg (follow_subject)
   ) as following_user;
+
+-- name: IsOnList :one
+select
+  count(*)
+from
+  list_membership
+where
+  list_uri = ?
+  and member_did = ?;

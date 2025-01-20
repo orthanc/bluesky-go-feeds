@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/bluesky-social/indigo/api/bsky"
@@ -117,5 +118,34 @@ func catchupMutuals(ctx context.Context, database database.Database, session sch
 }
 
 func catchupFollowers(ctx context.Context, database database.Database, session schema.Session, cursor string, limit int) (bsky.FeedGetFeedSkeleton_Output, error) {
+	output := bsky.FeedGetFeedSkeleton_Output{
+		Feed: make([]*bsky.FeedDefs_SkeletonFeedPost, 0, limit),
+	}
+	isFollowFarmerResult, err := database.Queries.IsOnList(ctx, schema.IsOnListParams{
+		ListUri:   os.Getenv("FOLLOW_FARMERS_LIST"),
+		MemberDid: session.UserDid,
+	})
+	if err != nil {
+		return output, err
+	}
+	if isFollowFarmerResult > 0 {
+		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
+			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lg4lxcvzlk2b",
+		})
+		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
+			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lg4lxcwgbs2b",
+		})
+		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
+			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lg4lxcwj7k2b",
+		})
+		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
+			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lg4lxcwk6s2b",
+		})
+		output.Feed = append(output.Feed, &bsky.FeedDefs_SkeletonFeedPost{
+			Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3lg4lxcwm5c2b",
+		})
+		return output, nil
+	}
+
 	return catchupVariant("catchupFollowers", catchupFollowersQuery, ctx, database, session, cursor, limit)
 }

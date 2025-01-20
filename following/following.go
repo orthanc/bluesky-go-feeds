@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -18,21 +19,24 @@ import (
 )
 
 type AllFollowing struct {
-	database     *database.Database
-	client       *xrpc.Client
-	publicClient *xrpc.Client
+	database            *database.Database
+	client              *xrpc.Client
+	publicClient        *xrpc.Client
+	followFarmerListUri string
 }
 
 var emptyFollowedBy []string
 
 const purgePageSize = 10000
+
 var cutoverTime = time.Date(2024, 11, 13, 8, 45, 0, 0, time.UTC)
 
-func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client) *AllFollowing {
+func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client, followFarmerListUri string) *AllFollowing {
 	allFollowing := &AllFollowing{
-		database:     database,
-		client:       client,
-		publicClient: publicClient,
+		database:            database,
+		client:              client,
+		publicClient:        publicClient,
+		followFarmerListUri: followFarmerListUri,
 	}
 
 	ctx := context.Background()
@@ -157,34 +161,121 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 
 	followers := make([]schema.Follower, 0, 100)
 	followersFromSync := make(map[string]bool)
-
-	for cursor := ""; ; {
-		lastRecorded := time.Now().UTC().Format(time.RFC3339)
-		followersResult, err := bsky.GraphGetFollowers(ctx, allFollowing.publicClient, user.UserDid, cursor, 100)
-		if err != nil {
-			return err
-		}
-
-		followers = followers[:len(followersResult.Followers)]
-		for i, record := range followersResult.Followers {
-			followers[i] = schema.Follower{
-				Following:    user.UserDid,
-				FollowedBy:   record.Did,
-				LastRecorded: lastRecorded,
+	isFollowFarmerResult, err := allFollowing.database.Queries.IsOnList(ctx, schema.IsOnListParams{
+		ListUri:   allFollowing.followFarmerListUri,
+		MemberDid: userDid,
+	})
+	if err != nil {
+		return err
+	}
+	if isFollowFarmerResult == 0 {
+		for cursor := ""; ; {
+			lastRecorded := time.Now().UTC().Format(time.RFC3339)
+			followersResult, err := bsky.GraphGetFollowers(ctx, allFollowing.publicClient, user.UserDid, cursor, 100)
+			if err != nil {
+				return err
 			}
-			followersFromSync[followers[i].FollowedBy] = true
+
+			followers = followers[:len(followersResult.Followers)]
+			for i, record := range followersResult.Followers {
+				followers[i] = schema.Follower{
+					Following:    user.UserDid,
+					FollowedBy:   record.Did,
+					LastRecorded: lastRecorded,
+				}
+				followersFromSync[followers[i].FollowedBy] = true
+			}
+			err = allFollowing.saveFollowerPage(ctx, followers)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Saved follower page for %s\n", userDid)
+			if followersResult.Cursor == nil {
+				break
+			}
+			cursor = *followersResult.Cursor
 		}
-		err = allFollowing.saveFollowerPage(ctx, followers)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Saved follower page for %s\n", userDid)
-		if followersResult.Cursor == nil {
-			break
-		}
-		cursor = *followersResult.Cursor
 	}
 	err = allFollowing.removeFollowersNotRecordedAfter(ctx, user.UserDid, syncStart)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (allFollowing *AllFollowing) SyncList(ctx context.Context, listUri string) error {
+	syncStart := time.Now().UTC().Format(time.RFC3339)
+	listUriParts := strings.SplitN(listUri, "/", 5)
+	if len(listUriParts) < 5 {
+		return fmt.Errorf("Cannot parse list uri %s", listUri)
+	}
+	listRepo := listUriParts[2]
+	listCollection := listUriParts[3]
+	if listCollection != "app.bsky.graph.list" {
+		return fmt.Errorf("Cannot parse list uri %s", listUri)
+	}
+
+	memberships := make([]schema.ListMembership, 0, 100)
+	for cursor := ""; ; {
+		lastRecorded := time.Now().UTC().Format(time.RFC3339)
+		itemsResult, err := atproto.RepoListRecords(ctx, allFollowing.client, "app.bsky.graph.listitem", cursor, 100, listRepo, false, "", "")
+		if err != nil {
+			return err
+		}
+
+		memberships = memberships[:0]
+		for _, record := range itemsResult.Records {
+			recordList := record.Value.Val.(*bsky.GraphListitem).List
+			recordSubject := record.Value.Val.(*bsky.GraphListitem).Subject
+			if recordList == listUri {
+				memberships = append(memberships, schema.ListMembership{
+					ListUri:      listUri,
+					MemberDid:    recordSubject,
+					LastRecorded: lastRecorded,
+				})
+				fmt.Printf("Saving %s\n", recordSubject)
+			}
+		}
+
+		err = allFollowing.saveListPage(ctx, memberships)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Saved list page for %s\n", listUri)
+		if itemsResult.Cursor == nil {
+			break
+		}
+		cursor = *itemsResult.Cursor
+	}
+	err := allFollowing.database.Updates.DeleteListMembershipNotRecordedBefore(ctx, writeSchema.DeleteListMembershipNotRecordedBeforeParams{
+		ListUri:      listUri,
+		LastRecorded: syncStart,
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Done listing\n")
+	return nil
+}
+
+func (allFollowing *AllFollowing) saveListPage(ctx context.Context, records []schema.ListMembership) error {
+	updates, tx, err := allFollowing.database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, record := range records {
+		if err := updates.SaveListMembership(ctx, writeSchema.SaveListMembershipParams{
+			ListUri:      record.ListUri,
+			MemberDid:    record.MemberDid,
+			LastRecorded: record.LastRecorded,
+		}); err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
@@ -212,6 +303,16 @@ func (allFollowing *AllFollowing) RemoveFollow(ctx context.Context, uri string) 
 }
 
 func (allFollowing *AllFollowing) RecordFollower(ctx context.Context, uri string, following string, followedBy string) error {
+	isFollowFarmerResult, err := allFollowing.database.Queries.IsOnList(ctx, schema.IsOnListParams{
+		ListUri:   allFollowing.followFarmerListUri,
+		MemberDid: following,
+	})
+	if err != nil {
+		return err
+	}
+	if isFollowFarmerResult > 0 {
+		return nil
+	}
 	record := schema.Follower{
 		Following:    following,
 		FollowedBy:   followedBy,
@@ -325,7 +426,7 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 	fmt.Printf("now %s\n", now.Format(time.RFC3339))
 	fmt.Printf("purgeBefore3Time %s\n", purgeBefore3Time.Format(time.RFC3339))
 	if now.Before(cutoverTime) {
-		timeUntilCutover := cutoverTime.Sub(now);
+		timeUntilCutover := cutoverTime.Sub(now)
 		fmt.Printf("timeUntilCutover %s\n", timeUntilCutover)
 		purgeBefore3Time = purgeBefore3Time.Add(-1 * timeUntilCutover)
 		fmt.Printf("purgeBefore3Time %s\n", purgeBefore3Time.Format(time.RFC3339))

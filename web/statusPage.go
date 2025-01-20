@@ -92,7 +92,7 @@ type StatusPage struct {
 }
 
 type Point struct {
-	X string `json:"x"`
+	X string  `json:"x"`
 	Y float64 `json:"y"`
 }
 
@@ -100,7 +100,7 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var eventsPerSecondData []Point
 	var lagTimeData []Point
 	var toCatchupData []Point
-	handler.processingStats.Iterate(func (run *subscription.ProcessingRun) {
+	handler.processingStats.Iterate(func(run *subscription.ProcessingRun) {
 		x := run.Timestamp.Format(time.RFC3339Nano)
 		eventsPerSecondData = append(eventsPerSecondData, Point{
 			X: x,
@@ -115,7 +115,7 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Y: run.ToCatchUp.Seconds(),
 		})
 	})
-	indexLagTime := lagTimeData[len(lagTimeData) / 2].Y
+	indexLagTime := lagTimeData[len(lagTimeData)/2].Y
 	unitLabel := "Seconds"
 	if indexLagTime > 7200 {
 		unitLabel = "Hours"
@@ -130,12 +130,12 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			toCatchupData[i].Y = toCatchupData[i].Y / 60
 		}
 	}
-	data := make(map[string]any);
+	data := make(map[string]any)
 	data["unitLabel"] = unitLabel
 	data["eventsPerSecondData"] = eventsPerSecondData
 	data["lagTimeData"] = lagTimeData
 	data["toCatchupData"] = toCatchupData
-	jsonData, err := json.Marshal(data);
+	jsonData, err := json.Marshal(data)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(fmt.Sprintf("%s", err)))
