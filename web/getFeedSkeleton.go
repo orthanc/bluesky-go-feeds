@@ -142,7 +142,7 @@ func (handler GetFeedSkeletonHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		w.WriteHeader(500)
 		return
 	}
-	if cursor == "" && len(result.Feed) == 0 && result.Cursor == nil {
+	if cursor == "" && len(result.Feed) == 0 && result.Cursor == nil && algKey != postersMadnessAlgorithmId {
 		result.Feed = []*bsky.FeedDefs_SkeletonFeedPost{
 			{
 				Post: "at://did:plc:crngjmsdh3zpuhmd5gtgwx6q/app.bsky.feed.post/3l7anu7yoj524",
