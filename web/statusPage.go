@@ -1,11 +1,13 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
@@ -21,6 +23,10 @@ const pageTemplate = `
 		</div>
 		<div style="max-width: 800px; padding: 1rem;">
 			<canvas id="lagTimeChart"></canvas>
+		</div>
+		<h1>Posters madness</h1>
+		<div>
+			<ul>%s</ul>
 		</div>
 
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@^3"></script>
@@ -89,6 +95,7 @@ const pageTemplate = `
 
 type StatusPage struct {
 	processingStats *subscription.ProcessingStats
+	database *database.Database
 }
 
 type Point struct {
@@ -141,6 +148,18 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("%s", err)))
 		return
 	}
+
+	postersMadnessStats, err := handler.database.Queries.GetPostersMadnessStats(context.Background())
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(fmt.Sprintf("%s", err)))
+		return
+	}
+	statsBlock := ""
+	for _, stat := range postersMadnessStats {
+		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stat.Stage, stat.Cnt);
+	}
+
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(fmt.Sprintf(pageTemplate, string(jsonData))))
+	w.Write([]byte(fmt.Sprintf(pageTemplate, statsBlock, string(jsonData))))
 }
