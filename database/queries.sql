@@ -178,7 +178,16 @@ select
       user as reply_root_user
     where
       reply_root_user.userDid = sqlc.arg (reply_root_author)
-  ) as reply_to_thread_user;
+  ) as reply_to_thread_user,
+  (
+    select
+      count(*)
+    from
+      posters_madness
+    where
+      stage = 'symptomatic'
+      and poster_did = sqlc.arg (post_author)
+  ) as posters_madness_symptomatic;
 
 -- name: GetFollowingFollowData :one
 select

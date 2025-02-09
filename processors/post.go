@@ -61,7 +61,8 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			interest.ReplyToAuthor > 0 ||
 			interest.ReplyToUser > 0 ||
 			interest.ReplyToThreadAuthor > 0 ||
-			interest.ReplyToThreadUser > 0) {
+			interest.ReplyToThreadUser > 0 ||
+			interest.PostersMadnessSymptomatic > 0) {
 			return nil
 		}
 		now := time.Now().UTC().Add(time.Minute)
@@ -88,7 +89,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 		indexedAt := indexAsDate.Format(time.RFC3339)
-		if interest.PostByAuthor > 0 {
+		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {
 			postIndexedAt := indexAsDate
 			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
