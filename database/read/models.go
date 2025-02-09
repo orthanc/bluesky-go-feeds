@@ -98,6 +98,12 @@ type PostInteractedByFollowedAuthor struct {
 	Followed                 sql.NullFloat64
 }
 
+type PostersMadness struct {
+	PosterDid   string
+	Stage       string
+	LastChecked string
+}
+
 type Repost struct {
 	Uri          string
 	RepostAuthor string

@@ -15,6 +15,7 @@ import (
 
 type LikeProcessor struct {
 	Database     *database.Database
+	PostersMadness *PostersMadness
 }
 
 func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event, likeUri string) error {
@@ -29,6 +30,10 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 		postAuthor := getAuthorFromPostUri(postUri)
 		if postAuthor == "" {
 			return nil
+		}
+		err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, postAuthor);
+		if err != nil {
+			return err
 		}
 
 		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{

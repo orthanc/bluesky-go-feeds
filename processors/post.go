@@ -15,6 +15,7 @@ import (
 
 type PostProcessor struct {
 	Database     *database.Database
+	PostersMadness *PostersMadness
 }
 
 func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
@@ -35,6 +36,13 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
+			}
+		}
+
+		if replyParentAuthor != "" {
+			err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, replyParentAuthor);
+			if err != nil {
+				return err
 			}
 		}
 

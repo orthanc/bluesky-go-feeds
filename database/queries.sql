@@ -207,3 +207,35 @@ from
 where
   list_uri = ?
   and member_did = ?;
+
+-- name: GetPostersMadnessStatus :many
+select
+  poster_did,
+  stage,
+  last_checked
+from
+  posters_madness
+where
+  poster_did in (sqlc.slice ('dids'));
+
+-- name: GetPostersMadnessNotUpdatedSince :many
+select
+  poster_did,
+  stage,
+  last_checked
+from
+  posters_madness
+where
+  last_checked < ?
+  and stage <> ?;
+
+-- name: GetPostersMadnessInStageNotUpdatedSince :many
+select
+  poster_did,
+  stage,
+  last_checked
+from
+  posters_madness
+where
+  last_checked < ?
+  and stage = ?;

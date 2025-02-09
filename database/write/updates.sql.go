@@ -138,6 +138,17 @@ func (q *Queries) DeletePostInteractedByFollowedBefore(ctx context.Context, arg 
 	return result.RowsAffected()
 }
 
+const deletePostersMadness = `-- name: DeletePostersMadness :exec
+delete from posters_madness
+where
+  poster_did = ?
+`
+
+func (q *Queries) DeletePostersMadness(ctx context.Context, posterDid string) error {
+	_, err := q.db.ExecContext(ctx, deletePostersMadness, posterDid)
+	return err
+}
+
 const deletePostsBefore = `-- name: DeletePostsBefore :execrows
 delete from post
 where
@@ -690,6 +701,24 @@ func (q *Queries) SavePostRepostedByFollowing(ctx context.Context, arg SavePostR
 	return err
 }
 
+const savePostersMadness = `-- name: SavePostersMadness :exec
+insert into
+  posters_madness (poster_did, stage, last_checked)
+values
+  (?, ?, ?) on conflict do nothing
+`
+
+type SavePostersMadnessParams struct {
+	PosterDid   string
+	Stage       string
+	LastChecked string
+}
+
+func (q *Queries) SavePostersMadness(ctx context.Context, arg SavePostersMadnessParams) error {
+	_, err := q.db.ExecContext(ctx, savePostersMadness, arg.PosterDid, arg.Stage, arg.LastChecked)
+	return err
+}
+
 const saveSession = `-- name: SaveSession :exec
 insert into
   session (
@@ -779,6 +808,26 @@ func (q *Queries) SaveUserInteraction(ctx context.Context, arg SaveUserInteracti
 		arg.PostUri,
 		arg.IndexedAt,
 	)
+	return err
+}
+
+const updatePostersMadnessStage = `-- name: UpdatePostersMadnessStage :exec
+update posters_madness
+set
+  stage = ?,
+  last_checked = ?
+where
+  poster_did = ?
+`
+
+type UpdatePostersMadnessStageParams struct {
+	Stage       string
+	LastChecked string
+	PosterDid   string
+}
+
+func (q *Queries) UpdatePostersMadnessStage(ctx context.Context, arg UpdatePostersMadnessStageParams) error {
+	_, err := q.db.ExecContext(ctx, updatePostersMadnessStage, arg.Stage, arg.LastChecked, arg.PosterDid)
 	return err
 }
 

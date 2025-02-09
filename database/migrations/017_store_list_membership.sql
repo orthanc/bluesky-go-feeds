@@ -7,4 +7,4 @@ create table list_membership (
 );
 
 -- +goose Down
-drop trigger list_membership;
+drop table list_membership;
