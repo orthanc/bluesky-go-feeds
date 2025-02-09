@@ -364,6 +364,37 @@ func (q *Queries) GetPostersMadnessNotUpdatedSince(ctx context.Context, arg GetP
 	return items, nil
 }
 
+const getPostersMadnessStats = `-- name: GetPostersMadnessStats :many
+select
+  stage,
+  cnt
+from
+  posters_madness_stats
+`
+
+func (q *Queries) GetPostersMadnessStats(ctx context.Context) ([]PostersMadnessStat, error) {
+	rows, err := q.db.QueryContext(ctx, getPostersMadnessStats)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PostersMadnessStat{}
+	for rows.Next() {
+		var i PostersMadnessStat
+		if err := rows.Scan(&i.Stage, &i.Cnt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPostersMadnessStatus = `-- name: GetPostersMadnessStatus :many
 select
   poster_did,

@@ -373,3 +373,9 @@ where
 delete from posters_madness
 where
   poster_did = ?;
+
+-- name: SavePostersMadnessLog :exec
+insert into
+  posters_madness_log (recorded_at, poster_did, stage, comment)
+values
+  (?, ?, ?, ?);

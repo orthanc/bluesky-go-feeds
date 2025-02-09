@@ -719,6 +719,30 @@ func (q *Queries) SavePostersMadness(ctx context.Context, arg SavePostersMadness
 	return err
 }
 
+const savePostersMadnessLog = `-- name: SavePostersMadnessLog :exec
+insert into
+  posters_madness_log (recorded_at, poster_did, stage, comment)
+values
+  (?, ?, ?, ?)
+`
+
+type SavePostersMadnessLogParams struct {
+	RecordedAt string
+	PosterDid  string
+	Stage      string
+	Comment    sql.NullString
+}
+
+func (q *Queries) SavePostersMadnessLog(ctx context.Context, arg SavePostersMadnessLogParams) error {
+	_, err := q.db.ExecContext(ctx, savePostersMadnessLog,
+		arg.RecordedAt,
+		arg.PosterDid,
+		arg.Stage,
+		arg.Comment,
+	)
+	return err
+}
+
 const saveSession = `-- name: SaveSession :exec
 insert into
   session (

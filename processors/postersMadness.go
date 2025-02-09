@@ -76,11 +76,21 @@ func (madness *PostersMadness) PostersMadnessInteraction(ctx context.Context, in
 		return nil;
 	}
 	fmt.Printf("Interaction between %s and infectious %s, INFECTION!\n", otherPoster, poster.PosterDid)
+	timestamp := time.Now().UTC().Format(time.RFC3339);
 	err = madness.database.Updates.SavePostersMadness(ctx, write.SavePostersMadnessParams{
 		PosterDid: otherPoster,
 		Stage: StageIncubating,
-		LastChecked: time.Now().UTC().Format(time.RFC3339),
+		LastChecked: timestamp,
 	});
+	if err != nil {
+		return err;
+	}
+	err = madness.database.Updates.SavePostersMadnessLog(ctx, write.SavePostersMadnessLogParams{
+		RecordedAt: timestamp,
+		PosterDid: otherPoster,
+		Stage: StageIncubating,
+		Comment: database.ToNullString(fmt.Sprintf("Infected by %s", poster.PosterDid)),
+	})
 	return err;
 }
 
@@ -97,6 +107,7 @@ func (madness *PostersMadness) UpdateStages(ctx context.Context) error {
 	}
 	fmt.Printf("Checking stage of %d posters\n", len(toUpdate))
 	var updates []write.UpdatePostersMadnessStageParams;
+	var logs []write.SavePostersMadnessLogParams;
 	for _, poster := range toUpdate {
 		if (poster.Stage == StageIncubating && rand.Float64() <= IncubatingToInfectiousProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
@@ -104,18 +115,33 @@ func (madness *PostersMadness) UpdateStages(ctx context.Context) error {
 				LastChecked: nowRFC3339,
 				PosterDid: poster.PosterDid,
 			});
+			logs = append(logs, write.SavePostersMadnessLogParams{
+				RecordedAt: nowRFC3339,
+				PosterDid: poster.PosterDid,
+				Stage: StageInfectious,
+			})
 		} else if (poster.Stage == StageInfectious && rand.Float64() <= InfectiousToSymptomaticProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: StageSymptomatic,
 				LastChecked: nowRFC3339,
 				PosterDid: poster.PosterDid,
 			});
+			logs = append(logs, write.SavePostersMadnessLogParams{
+				RecordedAt: nowRFC3339,
+				PosterDid: poster.PosterDid,
+				Stage: StageSymptomatic,
+			})
 		} else if (poster.Stage == StageSymptomatic && rand.Float64() <= SymptomaticToImmuneProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: StageImmune,
 				LastChecked: nowRFC3339,
 				PosterDid: poster.PosterDid,
 			});
+			logs = append(logs, write.SavePostersMadnessLogParams{
+				RecordedAt: nowRFC3339,
+				PosterDid: poster.PosterDid,
+				Stage: StageImmune,
+			})
 		} else {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: poster.Stage,
@@ -131,6 +157,12 @@ func (madness *PostersMadness) UpdateStages(ctx context.Context) error {
 	defer tx.Rollback();
 	for _, update := range updates {
 		err := updater.UpdatePostersMadnessStage(ctx, update);
+		if (err != nil) {
+			return err;
+		}
+	}
+	for _, log := range logs {
+		err := updater.SavePostersMadnessLog(ctx, log);
 		if (err != nil) {
 			return err;
 		}
@@ -152,9 +184,15 @@ func (madness *PostersMadness) PurgeImmune(ctx context.Context) error {
 	}
 	var updates []write.UpdatePostersMadnessStageParams;
 	var deletes []string;
+	var logs []write.SavePostersMadnessLogParams;
 	for _, poster := range toUpdate {
 		if (rand.Float64() <= ImmuneToDeleteProbability) {
 			deletes = append(deletes, poster.PosterDid);
+			logs = append(logs, write.SavePostersMadnessLogParams{
+				RecordedAt: nowRFC3339,
+				PosterDid: poster.PosterDid,
+				Stage: "immunity_waned",
+			})
 		} else {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: poster.Stage,
@@ -176,6 +214,12 @@ func (madness *PostersMadness) PurgeImmune(ctx context.Context) error {
 	}
 	for _, didToDelete := range deletes {
 		err := updater.DeletePostersMadness(ctx, didToDelete);
+		if (err != nil) {
+			return err;
+		}
+	}
+	for _, log := range logs {
+		err := updater.SavePostersMadnessLog(ctx, log);
 		if (err != nil) {
 			return err;
 		}

@@ -239,3 +239,10 @@ from
 where
   last_checked < ?
   and stage = ?;
+
+-- name: GetPostersMadnessStats :many
+select
+  stage,
+  cnt
+from
+  posters_madness_stats;

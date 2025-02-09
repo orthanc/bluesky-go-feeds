@@ -104,6 +104,19 @@ type PostersMadness struct {
 	LastChecked string
 }
 
+type PostersMadnessLog struct {
+	EntryID    int64
+	RecordedAt string
+	PosterDid  string
+	Stage      string
+	Comment    sql.NullString
+}
+
+type PostersMadnessStat struct {
+	Stage string
+	Cnt   interface{}
+}
+
 type Repost struct {
 	Uri          string
 	RepostAuthor string
