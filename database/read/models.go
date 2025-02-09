@@ -73,6 +73,7 @@ type Post struct {
 	ReplyRootAuthor   sql.NullString
 	RepostCount       float64
 	CreatedAt         sql.NullString
+	PostersMadness    sql.NullInt64
 }
 
 type PostInteractedByFollowed struct {

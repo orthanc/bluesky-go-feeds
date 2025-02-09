@@ -187,7 +187,16 @@ select
     where
       stage = 'symptomatic'
       and poster_did = sqlc.arg (post_author)
-  ) as posters_madness_symptomatic;
+  ) as posters_madness_symptomatic,
+  (
+    select
+      count(*)
+    from
+      posters_madness
+    where
+      stage = 'symptomatic'
+      and poster_did = sqlc.arg (reply_parent_author)
+  ) as posters_madness_reply_to_symptomatic;
 
 -- name: GetFollowingFollowData :one
 select

@@ -261,7 +261,16 @@ select
     where
       stage = 'symptomatic'
       and poster_did = ?1
-  ) as posters_madness_symptomatic
+  ) as posters_madness_symptomatic,
+  (
+    select
+      count(*)
+    from
+      posters_madness
+    where
+      stage = 'symptomatic'
+      and poster_did = ?2
+  ) as posters_madness_reply_to_symptomatic
 `
 
 type GetPostFollowDataParams struct {
@@ -271,13 +280,14 @@ type GetPostFollowDataParams struct {
 }
 
 type GetPostFollowDataRow struct {
-	PostByAuthor              int64
-	PostByUser                int64
-	ReplyToAuthor             int64
-	ReplyToUser               int64
-	ReplyToThreadAuthor       int64
-	ReplyToThreadUser         int64
-	PostersMadnessSymptomatic int64
+	PostByAuthor                     int64
+	PostByUser                       int64
+	ReplyToAuthor                    int64
+	ReplyToUser                      int64
+	ReplyToThreadAuthor              int64
+	ReplyToThreadUser                int64
+	PostersMadnessSymptomatic        int64
+	PostersMadnessReplyToSymptomatic int64
 }
 
 func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataParams) (GetPostFollowDataRow, error) {
@@ -291,6 +301,7 @@ func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataPa
 		&i.ReplyToThreadAuthor,
 		&i.ReplyToThreadUser,
 		&i.PostersMadnessSymptomatic,
+		&i.PostersMadnessReplyToSymptomatic,
 	)
 	return i, err
 }

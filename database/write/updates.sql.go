@@ -516,10 +516,11 @@ insert into
     "replyParent",
     "replyParentAuthor",
     "replyRoot",
-    "replyRootAuthor"
+    "replyRootAuthor",
+    posters_madness
   )
 values
-  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
 `
 
 type SavePostParams struct {
@@ -535,6 +536,7 @@ type SavePostParams struct {
 	ReplyParentAuthor sql.NullString
 	ReplyRoot         sql.NullString
 	ReplyRootAuthor   sql.NullString
+	PostersMadness    sql.NullInt64
 }
 
 func (q *Queries) SavePost(ctx context.Context, arg SavePostParams) error {
@@ -551,6 +553,7 @@ func (q *Queries) SavePost(ctx context.Context, arg SavePostParams) error {
 		arg.ReplyParentAuthor,
 		arg.ReplyRoot,
 		arg.ReplyRootAuthor,
+		arg.PostersMadness,
 	)
 	return err
 }

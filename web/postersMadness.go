@@ -8,7 +8,6 @@ import (
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/orthanc/feedgenerator/database"
 	schema "github.com/orthanc/feedgenerator/database/read"
-	processor "github.com/orthanc/feedgenerator/processors"
 )
 
 type postersMadnessQueryRow = struct {
@@ -25,12 +24,7 @@ select
   "indexedAt",
   author
 from post
-inner join posters_madness on post.author = posters_madness.poster_did AND posters_madness.stage = ?
-left outer join posters_madness as parent_posters_madness on "post"."replyParentAuthor" = parent_posters_madness.poster_did AND parent_posters_madness.stage = ?
-where (
-	"replyParent" is null
-	or parent_posters_madness.stage is not null
-)
+where posters_madness = 1
 order by indexedAt desc
 	limit
   ?
@@ -52,7 +46,7 @@ func postersMadnessFeed(ctx context.Context, database database.Database, session
 		}
 		offset = parsedOffset
 	}
-	rows, err := database.QueryContext(ctx, postersMadnessQuery, processor.StageSymptomatic, processor.StageSymptomatic, limit, offset)
+	rows, err := database.QueryContext(ctx, postersMadnessQuery, limit, offset)
 	if err != nil {
 		return output, fmt.Errorf("error executing postersMadness query: %s", err)
 	}

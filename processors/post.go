@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -104,6 +105,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			// 		}
 			// 	}
 			// }
+			var posters_madness int64 = 0;
+			if interest.PostersMadnessSymptomatic > 0 && (replyParentAuthor == "" || interest.PostersMadnessReplyToSymptomatic > 0) {
+				posters_madness = 1;
+			}
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               postUri,
 				Author:            event.Did,
@@ -117,6 +122,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 				InteractionCount:  0,
 				LikeCount:         0,
 				ReplyCount:        0,
+				PostersMadness:    sql.NullInt64{Int64: posters_madness, Valid: true},
 			})
 			if err != nil {
 				return err

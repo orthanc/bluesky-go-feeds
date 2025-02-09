@@ -21,10 +21,11 @@ insert into
     "replyParent",
     "replyParentAuthor",
     "replyRoot",
-    "replyRootAuthor"
+    "replyRootAuthor",
+    posters_madness
   )
 values
-  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: IncrementPostDirectReply :exec
 update post
