@@ -11,15 +11,17 @@ import (
 	"github.com/orthanc/feedgenerator/database/write"
 )
 
-const InteractionInfectionProbability float64 = 0.05;
-const IncubatingToInfectiousProbability float64 = 0.05;
-const InfectiousToSymptomaticProbability float64 = 0.10;
-const SymptomaticToImmuneProbability float64 = 0.01;
+const InteractionInfectionProbability float64 = 0.005;
+const IncubatingToPreInfectiousProbability float64 = 0.05;
+const PreInfectiousToInfectiousProbability float64 = 0.05;
+const InfectiousToPostInfectiouscProbability float64 = 0.05;
+const PostInfectiousToImmuneProbability float64 = 0.01;
 const ImmuneToDeleteProbability float64 = 0.05;
 
 const StageIncubating string = "incubating";
+const StagePreInfectious string = "pre-infectious";
 const StageInfectious string = "infectious";
-const StageSymptomatic string = "symptomatic";
+const StagePostInfectious string = "post-infectious";
 const StageImmune string = "immune";
 
 type PostersMadness struct {
@@ -63,7 +65,7 @@ func (madness *PostersMadness) PostersMadnessInteraction(ctx context.Context, in
 	}
 	poster := statusResult[0];
 	// The poster isn't infectious, so return
-	if poster.Stage != StageInfectious && poster.Stage != StageSymptomatic {
+	if poster.Stage != StageInfectious {
 		return nil;
 	}
 	otherPoster := interactionByDid
@@ -109,7 +111,18 @@ func (madness *PostersMadness) UpdateStages(ctx context.Context) error {
 	var updates []write.UpdatePostersMadnessStageParams;
 	var logs []write.SavePostersMadnessLogParams;
 	for _, poster := range toUpdate {
-		if (poster.Stage == StageIncubating && rand.Float64() <= IncubatingToInfectiousProbability) {
+		if (poster.Stage == StageIncubating && rand.Float64() <= IncubatingToPreInfectiousProbability) {
+			updates = append(updates, write.UpdatePostersMadnessStageParams{
+				Stage: StagePreInfectious,
+				LastChecked: nowRFC3339,
+				PosterDid: poster.PosterDid,
+			});
+			logs = append(logs, write.SavePostersMadnessLogParams{
+				RecordedAt: nowRFC3339,
+				PosterDid: poster.PosterDid,
+				Stage: StagePreInfectious,
+			})
+		} else if (poster.Stage == StagePreInfectious && rand.Float64() <= PreInfectiousToInfectiousProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: StageInfectious,
 				LastChecked: nowRFC3339,
@@ -120,18 +133,18 @@ func (madness *PostersMadness) UpdateStages(ctx context.Context) error {
 				PosterDid: poster.PosterDid,
 				Stage: StageInfectious,
 			})
-		} else if (poster.Stage == StageInfectious && rand.Float64() <= InfectiousToSymptomaticProbability) {
+		} else if (poster.Stage == StageInfectious && rand.Float64() <= InfectiousToPostInfectiouscProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
-				Stage: StageSymptomatic,
+				Stage: StagePostInfectious,
 				LastChecked: nowRFC3339,
 				PosterDid: poster.PosterDid,
 			});
 			logs = append(logs, write.SavePostersMadnessLogParams{
 				RecordedAt: nowRFC3339,
 				PosterDid: poster.PosterDid,
-				Stage: StageSymptomatic,
+				Stage: StagePostInfectious,
 			})
-		} else if (poster.Stage == StageSymptomatic && rand.Float64() <= SymptomaticToImmuneProbability) {
+		} else if (poster.Stage == StagePostInfectious && rand.Float64() <= PostInfectiousToImmuneProbability) {
 			updates = append(updates, write.UpdatePostersMadnessStageParams{
 				Stage: StageImmune,
 				LastChecked: nowRFC3339,

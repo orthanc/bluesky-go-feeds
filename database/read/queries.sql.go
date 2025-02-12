@@ -259,7 +259,7 @@ select
     from
       posters_madness
     where
-      stage = 'symptomatic'
+      stage in ('pre-infectious', 'infectious', 'post-infectious')
       and poster_did = ?1
   ) as posters_madness_symptomatic,
   (
@@ -268,7 +268,7 @@ select
     from
       posters_madness
     where
-      stage = 'symptomatic'
+      stage in ('pre-infectious', 'infectious', 'post-infectious')
       and poster_did = ?2
   ) as posters_madness_reply_to_symptomatic
 `

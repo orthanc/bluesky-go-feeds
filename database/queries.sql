@@ -185,7 +185,7 @@ select
     from
       posters_madness
     where
-      stage = 'symptomatic'
+      stage in ('pre-infectious', 'infectious', 'post-infectious')
       and poster_did = sqlc.arg (post_author)
   ) as posters_madness_symptomatic,
   (
@@ -194,7 +194,7 @@ select
     from
       posters_madness
     where
-      stage = 'symptomatic'
+      stage in ('pre-infectious', 'infectious', 'post-infectious')
       and poster_did = sqlc.arg (reply_parent_author)
   ) as posters_madness_reply_to_symptomatic;
 
