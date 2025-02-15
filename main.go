@@ -81,8 +81,9 @@ func main() {
 		AllFollowing: allFollowing,
 	}).Process
 	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
-		Database:     database,
+		Database:       database,
 		PostersMadness: postersMadness,
+		PublicClient:   &publicClient,
 	}).Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
 		Database:     database,

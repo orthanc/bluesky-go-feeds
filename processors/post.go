@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/bluesky-social/jetstream/pkg/models"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/database/read"
@@ -17,6 +19,107 @@ import (
 type PostProcessor struct {
 	Database       *database.Database
 	PostersMadness *PostersMadness
+	PublicClient   *xrpc.Client
+}
+
+func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
+	now := time.Now().UTC().Add(time.Minute)
+	indexedAtDate := now
+	createdAt, err := time.Parse(time.RFC3339, rawCreatedAt)
+	if err != nil {
+		fmt.Printf("Ignoring unparsable create date %s on post by %s, using %s instead\n", rawCreatedAt, authorDid, now)
+		indexedAtDate = now
+	}
+	indexedAtDate = createdAt.UTC()
+	if now.Before(indexedAtDate) {
+		fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexedAtDate, authorDid, now)
+		indexedAtDate = now
+	}
+	if indexedAtDate.Before(now.Add(-7 * 24 * time.Hour)) {
+		fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", authorDid, indexedAtDate)
+		return true, indexedAtDate
+	}
+	return false, indexedAtDate
+}
+
+func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *writeSchema.Queries, postUris []string) error {
+	if len(postUris) == 0 {
+		return nil;
+	}
+	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris);
+	if err != nil {
+		return err;
+	}
+	var urisToFetch []string;
+	for _, postUri := range postUris {
+		index := slices.IndexFunc(existingPosts, func(post read.GetPostsByUriRow) bool {
+			return post.Uri == postUri;
+		})
+		if index == -1 {
+			urisToFetch = append(urisToFetch, postUri);
+		}
+	}
+	if len(urisToFetch) == 0 {
+		return nil;
+	}
+
+	fetchedPosts, err := bsky.FeedGetPosts(ctx, processor.PublicClient, urisToFetch);
+	if err != nil {
+		return err;
+	}
+	for _, post := range fetchedPosts.Posts {
+		postRecord := post.Record.Val.(*bsky.FeedPost)
+		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
+		if postRecord.Reply != nil {
+			if postRecord.Reply.Parent != nil {
+				replyParent = postRecord.Reply.Parent.Uri
+				replyParentAuthor = getAuthorFromPostUri(replyParent)
+			}
+			if postRecord.Reply.Root != nil {
+				replyRoot = postRecord.Reply.Root.Uri
+				replyRootAuthor = getAuthorFromPostUri(replyRoot)
+			}
+		}
+
+		if post.Embed != nil {
+			if post.Embed.EmbedExternal_View != nil && post.Embed.EmbedExternal_View.External != nil {
+				externalUri = post.Embed.EmbedExternal_View.External.Uri
+			}
+			if post.Embed.EmbedRecord_View != nil && post.Embed.EmbedRecord_View.Record != nil && post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord != nil{
+				quotedPostUri = post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord.Uri
+			}
+			if post.Embed.EmbedRecordWithMedia_View != nil && post.Embed.EmbedRecordWithMedia_View.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord != nil {
+				quotedPostUri = post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord.Uri
+			}
+		}
+
+		rawCreatedAt := postRecord.CreatedAt;
+		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, post.Author.Did);
+		if skip {
+			continue;
+		}
+		err := updates.SavePost(ctx, writeSchema.SavePostParams{
+			Uri:               post.Uri,
+			Author:            post.Author.Did,
+			ReplyParent:       database.ToNullString(replyParent),
+			ReplyParentAuthor: database.ToNullString(replyParentAuthor),
+			ReplyRoot:         database.ToNullString(replyRoot),
+			ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
+			IndexedAt:         indexedAtDate.Format(time.RFC3339),
+			CreatedAt:         database.ToNullString(rawCreatedAt),
+			DirectReplyCount:  0,
+			InteractionCount:  0,
+			LikeCount:         0,
+			ReplyCount:        0,
+			PostersMadness:    sql.NullInt64{Int64: 0, Valid: false},
+			ExternalUri:       database.ToNullString(externalUri),
+			QuotedPostUri:     database.ToNullString(quotedPostUri),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil;
 }
 
 func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
@@ -29,6 +132,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
+		var referencedPosts []string;
 		if post.Reply != nil {
 			if post.Reply.Parent != nil {
 				replyParent = post.Reply.Parent.Uri
@@ -37,6 +141,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
+				referencedPosts = append(referencedPosts, replyParent);
 			}
 		}
 
@@ -46,9 +151,11 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			}
 			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecord.Record.Uri
+				referencedPosts = append(referencedPosts, quotedPostUri);
 			}
 			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
+				referencedPosts = append(referencedPosts, quotedPostUri);
 			}
 		}
 
@@ -78,22 +185,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			interest.PostersMadnessSymptomatic > 0) {
 			return nil
 		}
-		now := time.Now().UTC().Add(time.Minute)
-		indexAsDate := now
 		rawCreatedAt := post.CreatedAt
-		createdAt, err := time.Parse(time.RFC3339, rawCreatedAt)
-		if err != nil {
-			fmt.Printf("Ignoring unparsable create date %s on post by %s, using %s instead\n", rawCreatedAt, event.Did, now)
-			indexAsDate = now
-		}
-		indexAsDate = createdAt.UTC()
-		if now.Before(indexAsDate) {
-			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Did, now)
-			indexAsDate = now
-		}
-		if indexAsDate.Before(now.Add(-7 * 24 * time.Hour)) {
-			fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", event.Did, indexAsDate)
-			return nil
+		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, event.Did);
+		if skip {
+			return nil;
 		}
 
 		updates, tx, err := processor.Database.BeginTx(ctx)
@@ -101,9 +196,15 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			return err
 		}
 		defer tx.Rollback()
-		indexedAt := indexAsDate.Format(time.RFC3339)
+
+		err = processor.ensurePostsSaved(ctx, updates, referencedPosts);
+		if err != nil {
+			return err
+		}
+
+		indexedAt := indexedAtDate.Format(time.RFC3339)
 		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {
-			postIndexedAt := indexAsDate
+			postIndexedAt := indexedAtDate
 			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
 			// 	if parentPostDates.IndexedAt != "" {
@@ -111,7 +212,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			// 		if err == nil {
 			// 			minIndexedAt := parentIndexedAt.Add(30 * time.Second)
 			// 			if postIndexedAt.Before(minIndexedAt) {
-			// 				fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Did, indexAsDate, postIndexedAt)
+			// 				fmt.Printf("Delaying thread post by %s from %s to %s\n", event.Did, indexedAtDate, postIndexedAt)
 			// 				postIndexedAt = minIndexedAt
 			// 			}
 			// 		}

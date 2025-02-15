@@ -28,6 +28,15 @@ from
 where
   uri = ?;
 
+-- name: GetPostsByUri :many
+select
+  uri,
+  "indexedAt"
+from
+  post
+where
+  uri in (sqlc.slice ('uris'));
+
 -- name: ListAllUsers :many
 select
   "userDid"
