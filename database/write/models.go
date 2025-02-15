@@ -74,6 +74,8 @@ type Post struct {
 	RepostCount       float64
 	CreatedAt         sql.NullString
 	PostersMadness    sql.NullInt64
+	QuotedPostUri     sql.NullString
+	ExternalUri       sql.NullString
 }
 
 type PostInteractedByFollowed struct {

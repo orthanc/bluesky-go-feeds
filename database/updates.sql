@@ -22,10 +22,12 @@ insert into
     "replyParentAuthor",
     "replyRoot",
     "replyRootAuthor",
-    posters_madness
+    posters_madness,
+    external_uri,
+    quoted_post_uri
   )
 values
-  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing;
 
 -- name: IncrementPostDirectReply :exec
 update post
