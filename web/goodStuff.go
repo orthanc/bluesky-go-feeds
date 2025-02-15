@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 	"time"
@@ -15,6 +16,8 @@ type goodStuffQueryRow = struct {
 	Uri                  string
 	IndexedAt            string
 	Author               string
+	ExternalUri          sql.NullString
+	QuotedPostUri        sql.NullString
 	UserInteractionRatio float64
 	PiScore              float64
 	IScore               float64
@@ -25,7 +28,6 @@ type goodStuffQueryRow = struct {
 const goodStuffAlgorithmId = "oi8ydnb44i8y"
 
 const goodStuffQuery = `
--- name: GoodStuffFeed :many
 with
   "authorScoredPost" as (
     select
@@ -34,6 +36,8 @@ with
       "post"."author",
       "post"."replyParentAuthor",
       "post"."interactionCount",
+      post.external_uri as external_uri,
+      post.quoted_post_uri as quoted_post_uri,
       (unixepoch ('now') - unixepoch ("indexedAt")) / (24.0 * 3600) as "timeAgo",
       (
         unixepoch ("indexedAt") - unixepoch ('now', '-7 days')
@@ -54,6 +58,8 @@ with
       "authorScoredPost"."indexedAt",
       "authorScoredPost"."author",
       "authorScoredPost"."replyParentAuthor",
+      authorScoredPost.external_uri as external_uri,
+      authorScoredPost.quoted_post_uri as quoted_post_uri,
       "following"."userInteractionRatio",
       "following"."followedBy",
       "authorScoredPost"."piScore",
@@ -70,6 +76,8 @@ select
   "interactionScoredPost"."uri",
   "interactionScoredPost"."indexedAt",
   "interactionScoredPost"."author",
+  interactionScoredPost.external_uri as external_uri,
+  interactionScoredPost.quoted_post_uri as quoted_post_uri,
   "interactionScoredPost"."userInteractionRatio",
   "interactionScoredPost"."piScore",
   "interactionScoredPost"."iScore",
@@ -90,6 +98,8 @@ select
   "authorScoredPost"."uri",
   "authorScoredPost"."indexedAt",
   "authorScoredPost"."author",
+  authorScoredPost.external_uri as external_uri,
+  authorScoredPost.quoted_post_uri as quoted_post_uri,
   0 as "userInteractionRatio",
   0 as "piScore",
   0 as "iScore",
@@ -134,6 +144,8 @@ func goodStuff(ctx context.Context, database database.Database, session schema.S
 			&row.Uri,
 			&row.IndexedAt,
 			&row.Author,
+			&row.ExternalUri,
+			&row.QuotedPostUri,
 			&row.UserInteractionRatio,
 			&row.PiScore,
 			&row.IScore,

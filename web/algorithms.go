@@ -15,6 +15,7 @@ var algorithms = map[string]algorithm{
 	catchupMutualsAlgorithmId:    catchupMutuals,
 	catchupFollowersAlgorithmId:  catchupFollowers,
 	goodStuffAlgorithmId:         goodStuff,
+	dedupedGoodStuffAlgorithmId:  dedupedGoodStuff,
 	loveliesAlgorithmId:          lovelies,
 	quietPostersAlgorithmId:      quietPosters,
 	youMightLikeAlgorithmId:      youMightLike,
