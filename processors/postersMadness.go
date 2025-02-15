@@ -74,7 +74,6 @@ func (madness *PostersMadness) PostersMadnessInteraction(ctx context.Context, in
 	}
 	// The poster wasn't infected
 	if rand.Float64() > InteractionInfectionProbability {
-		fmt.Printf("Interaction between %s and infectious %s, no infection\n", otherPoster, poster.PosterDid)
 		return nil;
 	}
 	fmt.Printf("Interaction between %s and infectious %s, INFECTION!\n", otherPoster, poster.PosterDid)
