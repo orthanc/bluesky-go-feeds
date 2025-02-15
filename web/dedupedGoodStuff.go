@@ -43,12 +43,16 @@ func (buffer *postBuffer) removeIndex(index int) {
 }
 
 func (buffer *postBuffer) pushPost(post goodStuffQueryRow, rowNum int) bufferEntry {
+	fmt.Printf("SKIPPING ---  %s : %s : %s : %d : %t : %t \n", post.Uri, post.QuotedPostUri.String, post.ExternalUri.String, buffer.used, post.QuotedPostUri.Valid, post.ExternalUri.Valid)
 	if buffer.used > 0 && (post.ExternalUri.Valid || post.QuotedPostUri.Valid) {
 		current := buffer.startIndex
 		// Remove any posts from the buffer that have the same external uri or quote as the one we're adding
 		for true {
+			fmt.Printf("\tSKIPPING POST: QUOTED URI %s: %s == %s\n", post.Uri, post.QuotedPostUri.String, buffer.posts[current].post.QuotedPostUri.String)
 			if (post.ExternalUri.Valid && post.ExternalUri.String == buffer.posts[current].post.ExternalUri.String) ||
-				(post.QuotedPostUri.Valid && post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String) {
+				(post.QuotedPostUri.Valid && post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String) ||
+				(post.QuotedPostUri.Valid && post.QuotedPostUri.String == buffer.posts[current].post.Uri) ||
+				(post.Uri == buffer.posts[current].post.QuotedPostUri.String) {
 				fmt.Printf("SKIPPING POST %s\n", buffer.posts[current].post.Uri)
 				buffer.removeIndex(current)
 			} else {
