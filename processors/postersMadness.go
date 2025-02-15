@@ -11,7 +11,7 @@ import (
 	"github.com/orthanc/feedgenerator/database/write"
 )
 
-const InteractionInfectionProbability float64 = 0.005;
+const InteractionInfectionProbability float64 = 0.004;
 const IncubatingToPreInfectiousProbability float64 = 0.05;
 const PreInfectiousToInfectiousProbability float64 = 0.05;
 const InfectiousToPostInfectiouscProbability float64 = 0.05;
