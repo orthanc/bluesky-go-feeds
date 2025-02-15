@@ -28,7 +28,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 
-		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor string
+		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
 		if post.Reply != nil {
 			if post.Reply.Parent != nil {
 				replyParent = post.Reply.Parent.Uri
@@ -37,6 +37,18 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
+			}
+		}
+
+		if post.Embed != nil {
+			if post.Embed.EmbedExternal != nil && post.Embed.EmbedExternal.External != nil {
+				externalUri = post.Embed.EmbedExternal.External.Uri;
+			}
+			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
+				quotedPostUri = post.Embed.EmbedRecord.Record.Uri;
+			}
+			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
+				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
 			}
 		}
 
@@ -123,6 +135,8 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 				LikeCount:         0,
 				ReplyCount:        0,
 				PostersMadness:    sql.NullInt64{Int64: posters_madness, Valid: true},
+				ExternalUri:       database.ToNullString(externalUri),
+				QuotedPostUri:     database.ToNullString(quotedPostUri),
 			})
 			if err != nil {
 				return err
