@@ -95,7 +95,7 @@ const pageTemplate = `
 
 type StatusPage struct {
 	processingStats *subscription.ProcessingStats
-	database *database.Database
+	database        *database.Database
 }
 
 type Point struct {
@@ -157,7 +157,7 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	statsBlock := ""
 	for _, stat := range postersMadnessStats {
-		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stat.Stage, stat.Cnt);
+		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stat.Stage, stat.Cnt)
 	}
 
 	w.Header().Set("Content-Type", "text/html")

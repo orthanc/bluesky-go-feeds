@@ -50,7 +50,7 @@ func describeFeedGenerator(w http.ResponseWriter, r *http.Request) {
 func StartServer(database *database.Database, following *following.AllFollowing, processingStats *subscription.ProcessingStats) {
 	statusPage := StatusPage{
 		processingStats: processingStats,
-		database: database,
+		database:        database,
 	}
 	http.HandleFunc("GET /status", statusPage.ServeHTTP)
 	http.HandleFunc("GET /.well-known/did.json", wellKnownDidHandler)

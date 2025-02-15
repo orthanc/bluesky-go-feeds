@@ -13,14 +13,14 @@ import (
 )
 
 type ListItemProcessor struct {
-	database     *database.Database
-	listUri string
+	database *database.Database
+	listUri  string
 }
 
 func NewListItemProcessor(database *database.Database, listUri string) *ListItemProcessor {
 	return &ListItemProcessor{
 		database: database,
-		listUri: listUri,
+		listUri:  listUri,
 	}
 }
 
@@ -33,18 +33,18 @@ func (processor *ListItemProcessor) Process(ctx context.Context, event *models.E
 			return nil
 		}
 		if listitem.List != processor.listUri {
-			return nil;
+			return nil
 		}
 
 		err := processor.database.Updates.SaveListMembership(ctx, writeSchema.SaveListMembershipParams{
-			ListUri: listitem.List,
-			MemberDid: listitem.Subject,
+			ListUri:      listitem.List,
+			MemberDid:    listitem.Subject,
 			LastRecorded: time.Now().UTC().Format(time.RFC3339),
 		})
 		if err != nil {
 			return fmt.Errorf("unable to save list item %s", err)
 		}
-		return nil;
+		return nil
 	}
 	return nil
 }

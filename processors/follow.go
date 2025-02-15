@@ -27,7 +27,7 @@ func (processor *FollowProcessor) Process(ctx context.Context, event *models.Eve
 		}
 		subject := follow.Subject
 		interest, err := processor.Database.Queries.GetFollowingFollowData(ctx, read.GetFollowingFollowDataParams{
-			FollowAuthor: event.Did,
+			FollowAuthor:  event.Did,
 			FollowSubject: subject,
 		})
 		if err != nil {
@@ -47,7 +47,7 @@ func (processor *FollowProcessor) Process(ctx context.Context, event *models.Eve
 		}
 	case models.CommitOperationDelete:
 		interest, err := processor.Database.Queries.GetFollowingFollowData(ctx, read.GetFollowingFollowDataParams{
-			FollowAuthor: event.Did,
+			FollowAuthor:  event.Did,
 			FollowSubject: event.Did,
 		})
 		if err != nil {

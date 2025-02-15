@@ -15,7 +15,7 @@ import (
 )
 
 type PostProcessor struct {
-	Database     *database.Database
+	Database       *database.Database
 	PostersMadness *PostersMadness
 }
 
@@ -42,10 +42,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 
 		if post.Embed != nil {
 			if post.Embed.EmbedExternal != nil && post.Embed.EmbedExternal.External != nil {
-				externalUri = post.Embed.EmbedExternal.External.Uri;
+				externalUri = post.Embed.EmbedExternal.External.Uri
 			}
 			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
-				quotedPostUri = post.Embed.EmbedRecord.Record.Uri;
+				quotedPostUri = post.Embed.EmbedRecord.Record.Uri
 			}
 			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
@@ -53,16 +53,16 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 
 		if replyParentAuthor != "" {
-			err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, replyParentAuthor);
+			err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, replyParentAuthor)
 			if err != nil {
 				return err
 			}
 		}
 
 		interest, err := processor.Database.Queries.GetPostFollowData(ctx, read.GetPostFollowDataParams{
-			PostAuthor: event.Did,
+			PostAuthor:        event.Did,
 			ReplyParentAuthor: replyParentAuthor,
-			ReplyRootAuthor: replyRootAuthor,
+			ReplyRootAuthor:   replyRootAuthor,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to load post follow data %s", err)
@@ -86,7 +86,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			fmt.Printf("Ignoring unparsable create date %s on post by %s, using %s instead\n", rawCreatedAt, event.Did, now)
 			indexAsDate = now
 		}
-		indexAsDate = createdAt.UTC();
+		indexAsDate = createdAt.UTC()
 		if now.Before(indexAsDate) {
 			fmt.Printf("Ignoring future create date %s on post by %s, using %s instead\n", indexAsDate, event.Did, now)
 			indexAsDate = now
@@ -95,7 +95,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			fmt.Printf("Dropping post by %s with create date %s, more than 7 days ago\n", event.Did, indexAsDate)
 			return nil
 		}
-		
+
 		updates, tx, err := processor.Database.BeginTx(ctx)
 		if err != nil {
 			return err
@@ -117,9 +117,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			// 		}
 			// 	}
 			// }
-			var posters_madness int64 = 0;
+			var posters_madness int64 = 0
 			if interest.PostersMadnessSymptomatic > 0 && (replyParentAuthor == "" || interest.PostersMadnessReplyToSymptomatic > 0) {
-				posters_madness = 1;
+				posters_madness = 1
 			}
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               postUri,

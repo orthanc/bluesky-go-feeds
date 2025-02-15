@@ -12,7 +12,7 @@ import (
 )
 
 type RepostProcessor struct {
-	Database     *database.Database
+	Database *database.Database
 }
 
 func (processor *RepostProcessor) Process(ctx context.Context, event *models.Event, repostUri string) error {
@@ -39,7 +39,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 		// Quick return for reposts that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
-		if !(interest.PostByAuthor > 0) { 
+		if !(interest.PostByAuthor > 0) {
 			// ||
 			// authorIsFollowed) {
 			return nil

@@ -14,14 +14,14 @@ import (
 )
 
 type LikeProcessor struct {
-	Database     *database.Database
+	Database       *database.Database
 	PostersMadness *PostersMadness
 }
 
 func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event, likeUri string) error {
 	switch event.Commit.Operation {
 	case models.CommitOperationCreate:
-	var like bsky.FeedLike
+		var like bsky.FeedLike
 		if err := json.Unmarshal(event.Commit.Record, &like); err != nil {
 			fmt.Printf("failed to unmarshal like: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
 			return nil
@@ -31,7 +31,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 		if postAuthor == "" {
 			return nil
 		}
-		err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, postAuthor);
+		err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, postAuthor)
 		if err != nil {
 			return err
 		}
