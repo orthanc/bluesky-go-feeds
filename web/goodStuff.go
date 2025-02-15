@@ -18,6 +18,8 @@ type goodStuffQueryRow = struct {
 	Author               string
 	ExternalUri          sql.NullString
 	QuotedPostUri        sql.NullString
+	RootExternalUri      sql.NullString
+	RootQuotedPostUri    sql.NullString
 	UserInteractionRatio float64
 	PiScore              float64
 	IScore               float64
@@ -35,6 +37,7 @@ with
       "post"."indexedAt",
       "post"."author",
       "post"."replyParentAuthor",
+      "post"."replyRoot",
       "post"."interactionCount",
       post.external_uri as external_uri,
       post.quoted_post_uri as quoted_post_uri,
@@ -58,6 +61,7 @@ with
       "authorScoredPost"."indexedAt",
       "authorScoredPost"."author",
       "authorScoredPost"."replyParentAuthor",
+      "authorScoredPost"."replyRoot",
       authorScoredPost.external_uri as external_uri,
       authorScoredPost.quoted_post_uri as quoted_post_uri,
       "following"."userInteractionRatio",
@@ -78,6 +82,8 @@ select
   "interactionScoredPost"."author",
   interactionScoredPost.external_uri as external_uri,
   interactionScoredPost.quoted_post_uri as quoted_post_uri,
+  rootPost.external_uri as root_external_uri,
+  rootPost.quoted_post_uri as root_quoted_post_uri,
   "interactionScoredPost"."userInteractionRatio",
   "interactionScoredPost"."piScore",
   "interactionScoredPost"."iScore",
@@ -86,20 +92,23 @@ select
 from
   "interactionScoredPost"
   left join "following" as "parentFollowing" on "interactionScoredPost"."replyParentAuthor" = "parentFollowing"."following"
+  left join post as rootPost on interactionScoredPost.replyRoot = rootPost.uri
 where
   "interactionScoredPost"."followedBy" = ?
   and (
-    "replyParentAuthor" is null
+    interactionScoredPost."replyParentAuthor" is null
     or "parentFollowing"."followedBy" = ?
   )
-  and "indexedAt" < ?
+  and interactionScoredPost."indexedAt" < ?
 union all
 select
   "authorScoredPost"."uri",
   "authorScoredPost"."indexedAt",
   "authorScoredPost"."author",
-  authorScoredPost.external_uri as external_uri,
-  authorScoredPost.quoted_post_uri as quoted_post_uri,
+  null as external_uri,
+  null as quoted_post_uri,
+  null as root_external_uri,
+  null as root_quoted_post_uri,
   0 as "userInteractionRatio",
   0 as "piScore",
   0 as "iScore",
@@ -146,6 +155,8 @@ func goodStuff(ctx context.Context, database database.Database, session schema.S
 			&row.Author,
 			&row.ExternalUri,
 			&row.QuotedPostUri,
+			&row.RootExternalUri,
+			&row.RootQuotedPostUri,
 			&row.UserInteractionRatio,
 			&row.PiScore,
 			&row.IScore,

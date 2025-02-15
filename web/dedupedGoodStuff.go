@@ -47,11 +47,21 @@ func (buffer *postBuffer) pushPost(post goodStuffQueryRow, rowNum int) bufferEnt
 	if buffer.used > 0 && (post.ExternalUri.Valid || post.QuotedPostUri.Valid) {
 		current := buffer.startIndex
 		// Remove any posts from the buffer that have the same external uri or quote as the one we're adding
-		for true {
+		for {
 			fmt.Printf("\tSKIPPING POST: QUOTED URI %s: %s == %s\n", post.Uri, post.QuotedPostUri.String, buffer.posts[current].post.QuotedPostUri.String)
-			if (post.ExternalUri.Valid && post.ExternalUri.String == buffer.posts[current].post.ExternalUri.String) ||
-				(post.QuotedPostUri.Valid && post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String) ||
-				(post.QuotedPostUri.Valid && post.QuotedPostUri.String == buffer.posts[current].post.Uri) ||
+			if (post.ExternalUri.Valid && (
+					post.ExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
+					post.ExternalUri.String == buffer.posts[current].post.RootExternalUri.String)) ||
+				(post.RootExternalUri.Valid && (
+					post.RootExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
+					post.RootExternalUri.String == buffer.posts[current].post.RootExternalUri.String)) ||
+				(post.QuotedPostUri.Valid && (
+					post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
+					post.QuotedPostUri.String == buffer.posts[current].post.RootQuotedPostUri.String ||
+					post.QuotedPostUri.String == buffer.posts[current].post.Uri)) ||
+				(post.RootQuotedPostUri.Valid && (
+					post.RootQuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
+					post.RootQuotedPostUri.String == buffer.posts[current].post.RootQuotedPostUri.String)) ||
 				(post.Uri == buffer.posts[current].post.QuotedPostUri.String) {
 				fmt.Printf("SKIPPING POST %s\n", buffer.posts[current].post.Uri)
 				buffer.removeIndex(current)
@@ -113,6 +123,8 @@ func dedupedGoodStuff(ctx context.Context, database database.Database, session s
 			&row.Author,
 			&row.ExternalUri,
 			&row.QuotedPostUri,
+			&row.RootExternalUri,
+			&row.RootQuotedPostUri,
 			&row.UserInteractionRatio,
 			&row.PiScore,
 			&row.IScore,
