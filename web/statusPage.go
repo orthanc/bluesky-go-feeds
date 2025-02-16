@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
+	"github.com/orthanc/feedgenerator/database/read"
+	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
@@ -156,9 +159,21 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	statsBlock := ""
-	for _, stat := range postersMadnessStats {
-		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stat.Stage, stat.Cnt)
+	var count int64 = 0
+	for _, stage := range []string{processor.StageIncubating, processor.StagePreInfectious, processor.StageInfectious, processor.StagePostInfectious, processor.StageImmune} {
+		var cnt int64 = 0
+		index := slices.IndexFunc(postersMadnessStats, func(stat read.PostersMadnessStat) bool {
+			return stat.Stage == stage;
+		})
+		if index != -1 {
+			cnt = postersMadnessStats[index].Cnt.(int64)
+		}
+		if stage != processor.StageImmune {
+			count += cnt
+		}
+		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stage, cnt)
 	}
+	statsBlock += fmt.Sprintf("<li><b>TOTAL</b>: %d</li>", count)
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(fmt.Sprintf(pageTemplate, statsBlock, string(jsonData))))
