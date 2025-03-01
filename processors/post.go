@@ -197,10 +197,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 
-		err = processor.ensurePostsSaved(ctx, updates, referencedPosts);
-		if err != nil {
-			return err
-		}
+		// err = processor.ensurePostsSaved(ctx, updates, referencedPosts);
+		// if err != nil {
+		// 	return err
+		// }
 
 		indexedAt := indexedAtDate.Format(time.RFC3339)
 		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {
