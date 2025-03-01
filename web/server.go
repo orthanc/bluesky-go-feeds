@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"os"
 
+	_ "net/http/pprof"
+
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/orthanc/feedgenerator/database"
 	"github.com/orthanc/feedgenerator/following"
 	"github.com/orthanc/feedgenerator/subscription"
 )
+
 
 func wellKnownDidHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := json.Marshal(map[string]any{
