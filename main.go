@@ -47,6 +47,7 @@ func startProfile() (func(), error) {
 func main() {
 	go func() {
 		stopProfile, err := startProfile();
+		defer func () {stopProfile();}()
 		if err != nil {
 			log.Printf("Unable to start profiler %e\n", err);
 		}
