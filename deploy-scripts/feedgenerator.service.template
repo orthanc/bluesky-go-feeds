@@ -15,6 +15,7 @@ Environment=JETSTREAM_SUBSCRIPTION_ENDPOINT=wss://jetstream2.us-west.bsky.networ
 Environment=FEEDGEN_SQLITE_LOCATION="/home/feedgenerator/feed-data.db"
 Environment=FEEDGEN_PUBLISHER_DID={{ feed_publisher_did }}
 Environment=FEEDGEN_HOSTNAME={{ feed_hostname }}
+Environment=PROFILES_DIR=/home/feedgenerator/profiles
 Environment=FOLLOW_FARMERS_LIST=at://did:plc:ocsbmyulc2grbq3esflddyj6/app.bsky.graph.list/3lasodgegrc2a
 Environment=GOMEMLIMIT=100MiB
 

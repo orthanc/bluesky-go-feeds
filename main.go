@@ -4,7 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"runtime/pprof"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -19,7 +22,44 @@ import (
 	"github.com/orthanc/feedgenerator/web"
 )
 
+func startProfile() (func(), error) {
+	cpuProfName := filepath.Join(os.Getenv("PROFILES_DIR"), fmt.Sprintf("feedgen-cpu-%s.prof", time.Now().UTC().Format(time.RFC3339)));
+	cpuF, err := os.Create(cpuProfName);
+	if err != nil {
+		return func () {}, err;
+	}
+	err = pprof.StartCPUProfile(cpuF);
+	if err != nil {
+		return func () {
+			cpuF.Close();
+		}, err
+	}
+	log.Printf("Started CPU profile %s\n", cpuProfName);
+	stopCpuProf := func () {
+		log.Printf("Finishing CPU profile %s\n", cpuProfName);
+		pprof.StopCPUProfile();
+		cpuF.Close()
+	}
+
+	return stopCpuProf, nil
+}
+
 func main() {
+	go func() {
+		stopProfile, err := startProfile();
+		if err != nil {
+			log.Printf("Unable to start profiler %e\n", err);
+		}
+		ticker := time.NewTicker(1 * time.Hour);
+		for range ticker.C {
+			stopProfile();
+			stopProfile, err = startProfile();
+			if err != nil {
+				log.Printf("Unable to start profiler %e\n", err);
+			}
+		}
+
+	}()
 	ctx := context.Background()
 	dbDown := flag.Bool("db-down", false, "migrate the database down one revision then exit")
 	dbUp := flag.Bool("db-up", false, "migrate the database up to the latest revision then exit")
