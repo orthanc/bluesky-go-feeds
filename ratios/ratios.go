@@ -11,8 +11,9 @@ import (
 )
 
 type Ratios struct {
-	database *database.Database
-	Pauser   *pauser.Pauser
+	database            *database.Database
+	Pauser              *pauser.Pauser
+	authorMedianUpdates []updateAuthorMediansParams
 }
 
 func NewRatios(database *database.Database) *Ratios {
@@ -75,30 +76,33 @@ type updateAuthorMediansParams struct {
 	did                    string
 }
 
-func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) ([]updateAuthorMediansParams, error) {
-	query := fmt.Sprintf(
-		"select author, count(*), median(interactionCount) from post where author IN (%s) group by author",
-		"'"+strings.Join(batch, "','")+"'")
-	rows, err := ratios.database.QueryContext(ctx, query)
-	toSave := make([]updateAuthorMediansParams, len(batch))
-	if err != nil {
-		return toSave, fmt.Errorf("error calculating author stats: %s", err)
+func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) error {
+	if cap(ratios.authorMedianUpdates) < len(batch) {
+		ratios.authorMedianUpdates = make([]updateAuthorMediansParams, len(batch))
+	} else {
+		ratios.authorMedianUpdates = ratios.authorMedianUpdates[:len(batch)];
 	}
-	defer rows.Close()
-	ind := 0
-	for rows.Next() {
-		row := toSave[ind]
-		err := rows.Scan(
-			&row.did,
-			&row.postCount,
-			&row.medianInteractionCount,
-		)
-		ind++
+	var index int;
+	for _, did := range batch {
+		ratios.authorMedianUpdates[index].did = did;
+		countRow := ratios.database.QueryRowContext(ctx, "select count(*) from post where author = ?", did);
+		err := countRow.Scan(&ratios.authorMedianUpdates[index].postCount);
 		if err != nil {
-			return toSave, err
+			return fmt.Errorf("error calculating author post count: %s", err);
+		}
+
+		if ratios.authorMedianUpdates[index].postCount == 0 {
+			ratios.authorMedianUpdates[index].medianInteractionCount = 0;
+		} else {
+			midPoint := int64(ratios.authorMedianUpdates[index].postCount / 2);
+			interactionRow := ratios.database.QueryRowContext(ctx, "select interactionCount from post where author = ? order by interactionCount limit ? offset ?", did, 1, midPoint);
+			err := interactionRow.Scan(&ratios.authorMedianUpdates[index].medianInteractionCount);
+			if err != nil {
+				return fmt.Errorf("error calculating author median interaction count: %s", err);
+			}
 		}
 	}
-	return toSave, nil
+	return nil;
 }
 
 type updateInteractionRationParam struct {
@@ -133,7 +137,7 @@ func (ratios *Ratios) getInteractionRatiosToUpdate(ctx context.Context, authorDi
 }
 
 func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) error {
-	authorsToUpdate, err := ratios.getAuthorStats(ctx, batch)
+	err := ratios.getAuthorStats(ctx, batch)
 	if err != nil {
 		return err
 	}
@@ -146,7 +150,7 @@ func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) err
 		return err
 	}
 	defer tx.Rollback()
-	for _, row := range authorsToUpdate {
+	for _, row := range ratios.authorMedianUpdates {
 		_, err := tx.ExecContext(ctx, updateAuthorMedians, row.postCount, row.medianInteractionCount, row.did)
 		if err != nil {
 			return err
