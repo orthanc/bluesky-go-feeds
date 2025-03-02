@@ -233,7 +233,6 @@ func (allFollowing *AllFollowing) SyncList(ctx context.Context, listUri string) 
 					MemberDid:    recordSubject,
 					LastRecorded: lastRecorded,
 				})
-				fmt.Printf("Saving %s\n", recordSubject)
 			}
 		}
 
