@@ -25,8 +25,6 @@ type AllFollowing struct {
 	followFarmerListUri string
 }
 
-var emptyFollowedBy []string
-
 const purgePageSize = 10000
 
 var cutoverTime = time.Date(2024, 11, 13, 8, 45, 0, 0, time.UTC)
@@ -207,12 +205,12 @@ func (allFollowing *AllFollowing) SyncList(ctx context.Context, listUri string) 
 	syncStart := time.Now().UTC().Format(time.RFC3339)
 	listUriParts := strings.SplitN(listUri, "/", 5)
 	if len(listUriParts) < 5 {
-		return fmt.Errorf("Cannot parse list uri %s", listUri)
+		return fmt.Errorf("cannot parse list uri %s", listUri)
 	}
 	listRepo := listUriParts[2]
 	listCollection := listUriParts[3]
 	if listCollection != "app.bsky.graph.list" {
-		return fmt.Errorf("Cannot parse list uri %s", listUri)
+		return fmt.Errorf("cannot parse list uri %s", listUri)
 	}
 
 	memberships := make([]schema.ListMembership, 0, 100)
