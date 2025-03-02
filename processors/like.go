@@ -17,7 +17,36 @@ type LikeProcessor struct {
 	Database       *database.Database
 	PostersMadness *PostersMadness
 	likeInProgress bsky.FeedLike
+	interest       read.GetLikeFollowDataRow
 }
+
+const getLikeFollowData = `-- name: GetLikeFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      user as postUser
+    where
+      postUser."userDid" = ?1
+  ) as post_by_user,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      user as likeUser
+    where
+      likeUser."userDid" = ?2
+  ) as like_by_user
+`
 
 func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event, likeUri string) error {
 	switch event.Commit.Operation {
@@ -32,17 +61,15 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 
-		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{
-			PostAuthor: postAuthor,
-			LikeAuthor: event.Did,
-		})
+		row := processor.Database.QueryRowContext(ctx, getLikeFollowData, postAuthor, event.Did)
+		err := row.Scan(&processor.interest.PostByUser, &processor.interest.PostByAuthor, &processor.interest.LikeByUser)
 		if err != nil {
 			return fmt.Errorf("unable to load like follow data %s", err)
 		}
 		// Quick return for likes that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
-		if !(interest.PostByUser > 0 || interest.PostByAuthor > 0) {
+		if !(processor.interest.PostByUser > 0 || processor.interest.PostByAuthor > 0) {
 			// ||
 			// authorIsFollowed) {
 			return nil
@@ -54,13 +81,13 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 		indexedAt := time.Now().UTC().Format(time.RFC3339)
-		if interest.PostByAuthor > 0 {
+		if processor.interest.PostByAuthor > 0 {
 			err := updates.IncrementPostLike(ctx, postUri)
 			if err != nil {
 				return err
 			}
 
-			if interest.LikeByUser > 0 && event.Did != postAuthor {
+			if processor.interest.LikeByUser > 0 && event.Did != postAuthor {
 				err := updates.SaveUserInteraction(ctx, writeSchema.SaveUserInteractionParams{
 					InteractionUri: likeUri,
 					AuthorDid:      postAuthor,
@@ -74,7 +101,7 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 				}
 			}
 		}
-		if interest.PostByUser > 0 {
+		if processor.interest.PostByUser > 0 {
 			// Someone liking a post by one of the users
 			err := updates.SaveInteractionWithUser(ctx, writeSchema.SaveInteractionWithUserParams{
 				InteractionUri:       likeUri,
