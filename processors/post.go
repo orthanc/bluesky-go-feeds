@@ -159,13 +159,6 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			}
 		}
 
-		if replyParentAuthor != "" {
-			err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, replyParentAuthor)
-			if err != nil {
-				return err
-			}
-		}
-
 		interest, err := processor.Database.Queries.GetPostFollowData(ctx, read.GetPostFollowDataParams{
 			PostAuthor:        event.Did,
 			ReplyParentAuthor: replyParentAuthor,

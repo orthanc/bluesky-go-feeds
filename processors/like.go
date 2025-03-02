@@ -31,10 +31,6 @@ func (processor *LikeProcessor) Process(ctx context.Context, event *models.Event
 		if postAuthor == "" {
 			return nil
 		}
-		err := processor.PostersMadness.PostersMadnessInteraction(ctx, event.Did, postAuthor)
-		if err != nil {
-			return err
-		}
 
 		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{
 			PostAuthor: postAuthor,
