@@ -18,6 +18,7 @@ import (
 type ReferencedPost struct {
 	PostUri           string
 	SourceEventAuthor string
+	SourceIndexedAt   string
 }
 
 type PostProcessor struct {
@@ -61,10 +62,10 @@ func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
 
 func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referencedPosts []ReferencedPost) error {
 	postUris := make([]string, 0, len(referencedPosts))
-	sourceEventAuthorByPost := make(map[string]string)
+	referencedPostsByUri := make(map[string]ReferencedPost)
 	for _, referencedPost := range referencedPosts {
 		postUris = append(postUris, referencedPost.PostUri)
-		sourceEventAuthorByPost[referencedPost.PostUri] = referencedPost.SourceEventAuthor
+		referencedPostsByUri[referencedPost.PostUri] = referencedPost
 	}
 	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris)
 	if err != nil {
@@ -145,11 +146,24 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 		}
 
 		if externalUri != "" {
-				err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
+			err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
 				LinkUri:    externalUri,
-				SeenAt:     indexedAt,
+				SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
 				PostUri:    post.Uri,
-				PostAuthor: sourceEventAuthorByPost[post.Uri],
+				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	for _, post := range existingPosts {
+		if post.ExternalUri.Valid {
+			err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
+				LinkUri:    post.ExternalUri.String,
+				SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
+				PostUri:    post.Uri,
+				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
 			})
 			if err != nil {
 				return err
@@ -198,7 +212,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
-				referencedPosts = append(referencedPosts, replyParent)
+				referencedPosts = append(referencedPosts, replyRoot)
 			}
 		}
 
@@ -234,16 +248,19 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			interest.ReplyToThreadUser > 0) {
 			return nil
 		}
+
 		rawCreatedAt := post.CreatedAt
 		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, event.Did)
 		if skip {
 			return nil
 		}
+		indexedAt := indexedAtDate.Format(time.RFC3339)
 
 		for _, uri := range referencedPosts {
 			processor.PostUrisChan <- ReferencedPost{
 				PostUri:           uri,
 				SourceEventAuthor: event.Did,
+				SourceIndexedAt:   indexedAt,
 			}
 		}
 
@@ -253,9 +270,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 
-		indexedAt := indexedAtDate.Format(time.RFC3339)
 		if interest.PostByAuthor > 0 {
-			postIndexedAt := indexedAtDate
 			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
 			// 	if parentPostDates.IndexedAt != "" {
@@ -276,7 +291,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 				ReplyParentAuthor: database.ToNullString(replyParentAuthor),
 				ReplyRoot:         database.ToNullString(replyRoot),
 				ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
-				IndexedAt:         postIndexedAt.Format(time.RFC3339),
+				IndexedAt:         indexedAt,
 				CreatedAt:         database.ToNullString(rawCreatedAt),
 				DirectReplyCount:  0,
 				InteractionCount:  0,
@@ -292,7 +307,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if externalUri != "" {
 				err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
 					LinkUri:    externalUri,
-					SeenAt:     postIndexedAt.Format(time.RFC3339),
+					SeenAt:     indexedAt,
 					PostUri:    postUri,
 					PostAuthor: event.Did,
 				})

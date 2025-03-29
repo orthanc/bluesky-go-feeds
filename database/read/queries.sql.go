@@ -309,7 +309,8 @@ func (q *Queries) GetPostFollowData(ctx context.Context, arg GetPostFollowDataPa
 const getPostsByUri = `-- name: GetPostsByUri :many
 select
   uri,
-  "indexedAt"
+  "indexedAt",
+  external_uri
 from
   post
 where
@@ -317,8 +318,9 @@ where
 `
 
 type GetPostsByUriRow struct {
-	Uri       string
-	IndexedAt string
+	Uri         string
+	IndexedAt   string
+	ExternalUri sql.NullString
 }
 
 func (q *Queries) GetPostsByUri(ctx context.Context, uris []string) ([]GetPostsByUriRow, error) {
@@ -340,7 +342,7 @@ func (q *Queries) GetPostsByUri(ctx context.Context, uris []string) ([]GetPostsB
 	var items []GetPostsByUriRow
 	for rows.Next() {
 		var i GetPostsByUriRow
-		if err := rows.Scan(&i.Uri, &i.IndexedAt); err != nil {
+		if err := rows.Scan(&i.Uri, &i.IndexedAt, &i.ExternalUri); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

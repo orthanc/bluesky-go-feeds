@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/bluesky-social/indigo/api/bsky"
 	"github.com/bluesky-social/jetstream/pkg/models"
@@ -50,6 +51,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			processor.PostUrisChan <- ReferencedPost{
 				PostUri:           postUri,
 				SourceEventAuthor: event.Did,
+				SourceIndexedAt:   time.Now().UTC().Format(time.RFC3339),
 			}
 		}
 

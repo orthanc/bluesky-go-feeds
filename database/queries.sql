@@ -31,7 +31,8 @@ where
 -- name: GetPostsByUri :many
 select
   uri,
-  "indexedAt"
+  "indexedAt",
+  external_uri
 from
   post
 where
