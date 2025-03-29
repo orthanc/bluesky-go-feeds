@@ -155,7 +155,9 @@ func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
 		}
 		fmt.Printf("Resolving batch of %d posts\n", len(batch))
 		err := processor.ensurePostsSaved(ctx, batch)
-		fmt.Printf("Error saving post batch %e\n", err)
+		if err != nil {
+			fmt.Printf("Error saving post batch %e\n", err)
+		}
 	}
 }
 
@@ -221,15 +223,15 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 
+		for _, uri := range referencedPosts {
+			processor.PostUrisChan <- uri
+		}
+
 		updates, tx, err := processor.Database.BeginTx(ctx)
 		if err != nil {
 			return err
 		}
 		defer tx.Rollback()
-
-		for _, uri := range referencedPosts {
-			processor.PostUrisChan <- uri
-		}
 
 		indexedAt := indexedAtDate.Format(time.RFC3339)
 		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {

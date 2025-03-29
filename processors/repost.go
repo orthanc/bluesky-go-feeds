@@ -46,6 +46,10 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			return nil
 		}
 
+		if interest.RepostByAuthor > 0 {
+			processor.PostUrisChan <- postUri
+		}
+
 		updates, tx, err := processor.Database.BeginTx(ctx)
 		if err != nil {
 			return err
@@ -57,10 +61,6 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			if err != nil {
 				return err
 			}
-		}
-
-		if interest.RepostByAuthor > 0 {
-			processor.PostUrisChan <- postUri
 		}
 
 		// for _, followedBy := range authorFollowedBy {
