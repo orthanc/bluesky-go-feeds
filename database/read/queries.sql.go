@@ -509,6 +509,43 @@ func (q *Queries) GetPostsByUri(ctx context.Context, uris []string) ([]GetPostsB
 	return items, nil
 }
 
+const getRepostFollowData = `-- name: GetRepostFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      author.did = ?1
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      author.did = ?2
+  ) as repost_by_author
+`
+
+type GetRepostFollowDataParams struct {
+	PostAuthor   string
+	RepostAuthor string
+}
+
+type GetRepostFollowDataRow struct {
+	PostByAuthor   int64
+	RepostByAuthor int64
+}
+
+func (q *Queries) GetRepostFollowData(ctx context.Context, arg GetRepostFollowDataParams) (GetRepostFollowDataRow, error) {
+	row := q.db.QueryRowContext(ctx, getRepostFollowData, arg.PostAuthor, arg.RepostAuthor)
+	var i GetRepostFollowDataRow
+	err := row.Scan(&i.PostByAuthor, &i.RepostByAuthor)
+	return i, err
+}
+
 const isOnList = `-- name: IsOnList :one
 select
   count(*)

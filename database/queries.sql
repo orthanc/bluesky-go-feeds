@@ -138,6 +138,25 @@ select
       likeUser."userDid" = sqlc.arg (like_author)
   ) as like_by_user;
 
+-- name: GetRepostFollowData :one
+select
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      author.did = sqlc.arg (post_author)
+  ) as post_by_author,
+  (
+    select
+      count(*)
+    from
+      author
+    where
+      author.did = sqlc.arg (repost_author)
+  ) as repost_by_author;
+
 -- name: GetPostFollowData :one
 select
   (

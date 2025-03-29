@@ -115,19 +115,21 @@ func main() {
 
 	postersMadness := processor.NewPostersMadness(database)
 	processingStats := subscription.NewProcessingStats()
+	postProcessor := processor.NewPostProcessor(database, postersMadness, &publicClient)
 	go web.StartServer(database, allFollowing, processingStats)
 	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
 	firehoseListeners["app.bsky.graph.follow"] = (&processor.FollowProcessor{
 		Database:     database,
 		AllFollowing: allFollowing,
 	}).Process
-	firehoseListeners["app.bsky.feed.post"] = processor.NewPostProcessor(database, postersMadness, &publicClient).Process
+	firehoseListeners["app.bsky.feed.post"] = postProcessor.Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
 		Database:       database,
 		PostersMadness: postersMadness,
 	}).Process
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
 		Database: database,
+		PostUrisChan: postProcessor.PostUrisChan,
 	}).Process
 	firehoseListeners["app.bsky.graph.listitem"] = processor.NewListItemProcessor(database, followFarmersList).Process
 	fmt.Println("Starting")

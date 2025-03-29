@@ -12,7 +12,8 @@ import (
 )
 
 type RepostProcessor struct {
-	Database *database.Database
+	Database     *database.Database
+	PostUrisChan chan string
 }
 
 func (processor *RepostProcessor) Process(ctx context.Context, event *models.Event, repostUri string) error {
@@ -29,9 +30,9 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			return nil
 		}
 
-		interest, err := processor.Database.Queries.GetLikeFollowData(ctx, read.GetLikeFollowDataParams{
-			PostAuthor: postAuthor,
-			LikeAuthor: event.Did,
+		interest, err := processor.Database.Queries.GetRepostFollowData(ctx, read.GetRepostFollowDataParams{
+			PostAuthor:   postAuthor,
+			RepostAuthor: event.Did,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to load like follow data %s", err)
@@ -39,7 +40,7 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 		// Quick return for reposts that we have no interest in so that we can avoid starting transactions for them
 		// authorFollowedBy := processor.AllFollowing.FollowedBy(event.Did)
 		// authorIsFollowed := len(authorFollowedBy) > 0
-		if !(interest.PostByAuthor > 0) {
+		if !(interest.PostByAuthor > 0 || interest.RepostByAuthor >= 0) {
 			// ||
 			// authorIsFollowed) {
 			return nil
@@ -56,6 +57,10 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 			if err != nil {
 				return err
 			}
+		}
+
+		if interest.RepostByAuthor > 0 {
+			processor.PostUrisChan <- postUri
 		}
 
 		// for _, followedBy := range authorFollowedBy {
