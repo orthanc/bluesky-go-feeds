@@ -26,7 +26,7 @@ type PostProcessor struct {
 func NewPostProcessor(Database *database.Database,
 	PostersMadness *PostersMadness,
 	PublicClient *xrpc.Client) *PostProcessor {
-	PostUrisChan := make(chan string, 25)
+	PostUrisChan := make(chan string, 100)
 	processor := PostProcessor{
 		Database:       Database,
 		PostersMadness: PostersMadness,
@@ -153,7 +153,6 @@ func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
 				break LOOP
 			}
 		}
-		fmt.Printf("Resolving batch of %d posts\n", len(batch))
 		err := processor.ensurePostsSaved(ctx, batch)
 		if err != nil {
 			fmt.Printf("Error saving post batch %e\n", err)
