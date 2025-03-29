@@ -23,21 +23,21 @@ import (
 )
 
 func startProfile() (func(), error) {
-	cpuProfName := filepath.Join(os.Getenv("PROFILES_DIR"), fmt.Sprintf("feedgen-cpu-%s.prof", time.Now().UTC().Format(time.RFC3339)));
-	cpuF, err := os.Create(cpuProfName);
+	cpuProfName := filepath.Join(os.Getenv("PROFILES_DIR"), fmt.Sprintf("feedgen-cpu-%s.prof", time.Now().UTC().Format(time.RFC3339)))
+	cpuF, err := os.Create(cpuProfName)
 	if err != nil {
-		return func () {}, err;
+		return func() {}, err
 	}
-	err = pprof.StartCPUProfile(cpuF);
+	err = pprof.StartCPUProfile(cpuF)
 	if err != nil {
-		return func () {
-			cpuF.Close();
+		return func() {
+			cpuF.Close()
 		}, err
 	}
-	log.Printf("Started CPU profile %s\n", cpuProfName);
-	stopCpuProf := func () {
-		log.Printf("Finishing CPU profile %s\n", cpuProfName);
-		pprof.StopCPUProfile();
+	log.Printf("Started CPU profile %s\n", cpuProfName)
+	stopCpuProf := func() {
+		log.Printf("Finishing CPU profile %s\n", cpuProfName)
+		pprof.StopCPUProfile()
 		cpuF.Close()
 	}
 
@@ -46,17 +46,17 @@ func startProfile() (func(), error) {
 
 func main() {
 	go func() {
-		stopProfile, err := startProfile();
-		defer func () {stopProfile();}()
+		stopProfile, err := startProfile()
+		defer func() { stopProfile() }()
 		if err != nil {
-			log.Printf("Unable to start profiler %e\n", err);
+			log.Printf("Unable to start profiler %e\n", err)
 		}
-		ticker := time.NewTicker(1 * time.Hour);
+		ticker := time.NewTicker(1 * time.Hour)
 		for range ticker.C {
-			stopProfile();
-			stopProfile, err = startProfile();
+			stopProfile()
+			stopProfile, err = startProfile()
 			if err != nil {
-				log.Printf("Unable to start profiler %e\n", err);
+				log.Printf("Unable to start profiler %e\n", err)
 			}
 		}
 
@@ -113,7 +113,7 @@ func main() {
 		}
 	}()
 
-	postersMadness := processor.NewPostersMadness(database);
+	postersMadness := processor.NewPostersMadness(database)
 	processingStats := subscription.NewProcessingStats()
 	go web.StartServer(database, allFollowing, processingStats)
 	firehoseListeners := make(map[string]subscription.JetstreamEventListener)
@@ -121,19 +121,15 @@ func main() {
 		Database:     database,
 		AllFollowing: allFollowing,
 	}).Process
-	firehoseListeners["app.bsky.feed.post"] = (&processor.PostProcessor{
-		Database:       database,
-		PostersMadness: postersMadness,
-		PublicClient:   &publicClient,
-	}).Process
+	firehoseListeners["app.bsky.feed.post"] = processor.NewPostProcessor(database, postersMadness, &publicClient).Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
-		Database:     database,
+		Database:       database,
 		PostersMadness: postersMadness,
 	}).Process
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
-		Database:     database,
+		Database: database,
 	}).Process
-	firehoseListeners["app.bsky.graph.listitem"] = processor.NewListItemProcessor(database, followFarmersList ).Process
+	firehoseListeners["app.bsky.graph.listitem"] = processor.NewListItemProcessor(database, followFarmersList).Process
 	fmt.Println("Starting")
 	err = subscription.SubscribeJetstream(ctx, os.Getenv("JETSTREAM_SUBSCRIPTION_ENDPOINT"), database, firehoseListeners, ratioCalc.Pauser, processingStats)
 	if err != nil {

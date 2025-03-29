@@ -20,6 +20,22 @@ type PostProcessor struct {
 	Database       *database.Database
 	PostersMadness *PostersMadness
 	PublicClient   *xrpc.Client
+	PostUrisChan   chan string
+}
+
+func NewPostProcessor(Database *database.Database,
+	PostersMadness *PostersMadness,
+	PublicClient *xrpc.Client) *PostProcessor {
+	PostUrisChan := make(chan string, 25)
+	processor := PostProcessor{
+		Database:       Database,
+		PostersMadness: PostersMadness,
+		PublicClient:   PublicClient,
+		PostUrisChan:   PostUrisChan,
+	}
+
+	go processor.batchEnsurePostsSaved(context.Background())
+	return &processor
 }
 
 func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
@@ -42,10 +58,7 @@ func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
 	return false, indexedAtDate
 }
 
-func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *writeSchema.Queries, postUris []string) error {
-	if len(postUris) == 0 {
-		return nil
-	}
+func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris []string) error {
 	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris)
 	if err != nil {
 		return err
@@ -67,6 +80,11 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *w
 	if err != nil {
 		return err
 	}
+	updates, tx, err := processor.Database.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	for _, post := range fetchedPosts.Posts {
 		postRecord := post.Record.Val.(*bsky.FeedPost)
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
@@ -119,7 +137,26 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *w
 			return err
 		}
 	}
+	tx.Commit()
 	return nil
+}
+
+func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
+	for uri := range processor.PostUrisChan {
+		batch := []string{uri}
+	LOOP:
+		for len(batch) < 25 {
+			select {
+			case uri = <-processor.PostUrisChan:
+				batch = append(batch, uri)
+			default:
+				break LOOP
+			}
+		}
+		fmt.Printf("Resolving batch of %d posts\n", len(batch))
+		err := processor.ensurePostsSaved(ctx, batch)
+		fmt.Printf("Error saving post batch %e\n", err)
+	}
 }
 
 func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
@@ -190,10 +227,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		defer tx.Rollback()
 
-		// err = processor.ensurePostsSaved(ctx, updates, referencedPosts);
-		// if err != nil {
-		// 	return err
-		// }
+		for _, uri := range referencedPosts {
+			processor.PostUrisChan <- uri
+		}
 
 		indexedAt := indexedAtDate.Format(time.RFC3339)
 		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {
