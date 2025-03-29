@@ -157,3 +157,13 @@ type UserInteraction struct {
 	PostUri        string
 	IndexedAt      string
 }
+
+type UserLink struct {
+	UserDid          string
+	LinkUri          string
+	ShareCount       float64
+	FirstSeen        string
+	LastSeen         string
+	FirstSeenPostUri string
+	LastSeenPostUri  string
+}

@@ -491,6 +491,16 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 		return fmt.Errorf("error purging interactions by followed: %w", err)
 	}
 
+	_, err = pagedPurge("Deleted %d user links", func() (int64, error) {
+		return updates.DeleteUserLinksBefore(ctx, writeSchema.DeleteUserLinksBeforeParams{
+			LastSeen: purgeBefore,
+			Limit:    purgePageSize,
+		})
+	})
+	if err != nil {
+		return fmt.Errorf("error purging user links: %w", err)
+	}
+
 	usersToDelete, err := allFollowing.database.Queries.ListUsersNotSeenSince(ctx, purgeBefore)
 	if err != nil {
 		return fmt.Errorf("error listing users to purge: %w", err)

@@ -357,3 +357,46 @@ delete from list_membership
 where
   list_uri = ?
   and last_recorded < ?;
+
+-- name: SaveUserLink :exec
+insert into
+  user_link (
+    user_did,
+    link_uri,
+    share_count,
+    first_seen,
+    last_seen,
+    first_seen_post_uri,
+    last_seen_post_uri
+  )
+select
+  followedBy,
+  sqlc.arg ('linkUri'),
+  1,
+  sqlc.arg ('seenAt'),
+  sqlc.arg ('seenAt'),
+  sqlc.arg ('postUri'),
+  sqlc.arg ('postUri')
+from
+  following
+where
+  following.following = sqlc.arg ('postAuthor') on conflict do
+update
+set
+  share_count = share_count + 1,
+  last_seen = excluded.last_seen,
+  last_seen_post_uri = excluded.last_seen_post_uri;
+
+-- name: DeleteUserLinksBefore :execrows
+delete from user_link
+where
+  rowid in (
+    select
+      rowid
+    from
+      user_link
+    where
+      user_link.last_seen <= ?
+    limit
+      ?
+  );

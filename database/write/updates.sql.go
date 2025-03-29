@@ -250,6 +250,34 @@ func (q *Queries) DeleteUserInteractionsBefore(ctx context.Context, arg DeleteUs
 	return result.RowsAffected()
 }
 
+const deleteUserLinksBefore = `-- name: DeleteUserLinksBefore :execrows
+delete from user_link
+where
+  rowid in (
+    select
+      rowid
+    from
+      user_link
+    where
+      user_link.last_seen <= ?
+    limit
+      ?
+  )
+`
+
+type DeleteUserLinksBeforeParams struct {
+	LastSeen string
+	Limit    int64
+}
+
+func (q *Queries) DeleteUserLinksBefore(ctx context.Context, arg DeleteUserLinksBeforeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserLinksBefore, arg.LastSeen, arg.Limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteUserWhenNotSeen = `-- name: DeleteUserWhenNotSeen :execrows
 delete from user
 where
@@ -787,6 +815,53 @@ func (q *Queries) SaveUserInteraction(ctx context.Context, arg SaveUserInteracti
 		arg.AuthorDid,
 		arg.PostUri,
 		arg.IndexedAt,
+	)
+	return err
+}
+
+const saveUserLink = `-- name: SaveUserLink :exec
+insert into
+  user_link (
+    user_did,
+    link_uri,
+    share_count,
+    first_seen,
+    last_seen,
+    first_seen_post_uri,
+    last_seen_post_uri
+  )
+select
+  followedBy,
+  ?1,
+  1,
+  ?2,
+  ?2,
+  ?3,
+  ?3
+from
+  following
+where
+  following.following = ?4 on conflict do
+update
+set
+  share_count = share_count + 1,
+  last_seen = excluded.last_seen,
+  last_seen_post_uri = excluded.last_seen_post_uri
+`
+
+type SaveUserLinkParams struct {
+	LinkUri    string
+	SeenAt     string
+	PostUri    string
+	PostAuthor string
+}
+
+func (q *Queries) SaveUserLink(ctx context.Context, arg SaveUserLinkParams) error {
+	_, err := q.db.ExecContext(ctx, saveUserLink,
+		arg.LinkUri,
+		arg.SeenAt,
+		arg.PostUri,
+		arg.PostAuthor,
 	)
 	return err
 }

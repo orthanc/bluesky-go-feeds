@@ -261,6 +261,18 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if err != nil {
 				return err
 			}
+
+			if externalUri != "" {
+				err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
+					LinkUri:    externalUri,
+					SeenAt:     postIndexedAt.Format(time.RFC3339),
+					PostUri:    postUri,
+					PostAuthor: event.Did,
+				})
+				if err != nil {
+					return err
+				}
+			}
 			// if replyParent != "" {
 			// 	for _, followedBy := range authorFollowedBy {
 			// 		err := updates.SavePostDirectRepliedToByFollowing(ctx, writeSchema.SavePostDirectRepliedToByFollowingParams{
