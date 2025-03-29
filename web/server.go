@@ -14,7 +14,6 @@ import (
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
-
 func wellKnownDidHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := json.Marshal(map[string]any{
 		"@context": []string{"https://www.w3.org/ns/did/v1"},

@@ -49,18 +49,14 @@ func (buffer *postBuffer) pushPost(post goodStuffQueryRow, rowNum int) bufferEnt
 		// Remove any posts from the buffer that have the same external uri or quote as the one we're adding
 		for {
 			fmt.Printf("\tSKIPPING POST: QUOTED URI %s: %s == %s\n", post.Uri, post.QuotedPostUri.String, buffer.posts[current].post.QuotedPostUri.String)
-			if (post.ExternalUri.Valid && (
-					post.ExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
-					post.ExternalUri.String == buffer.posts[current].post.RootExternalUri.String)) ||
-				(post.RootExternalUri.Valid && (
-					post.RootExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
+			if (post.ExternalUri.Valid && (post.ExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
+				post.ExternalUri.String == buffer.posts[current].post.RootExternalUri.String)) ||
+				(post.RootExternalUri.Valid && (post.RootExternalUri.String == buffer.posts[current].post.ExternalUri.String ||
 					post.RootExternalUri.String == buffer.posts[current].post.RootExternalUri.String)) ||
-				(post.QuotedPostUri.Valid && (
-					post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
+				(post.QuotedPostUri.Valid && (post.QuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
 					post.QuotedPostUri.String == buffer.posts[current].post.RootQuotedPostUri.String ||
 					post.QuotedPostUri.String == buffer.posts[current].post.Uri)) ||
-				(post.RootQuotedPostUri.Valid && (
-					post.RootQuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
+				(post.RootQuotedPostUri.Valid && (post.RootQuotedPostUri.String == buffer.posts[current].post.QuotedPostUri.String ||
 					post.RootQuotedPostUri.String == buffer.posts[current].post.RootQuotedPostUri.String)) ||
 				(post.Uri == buffer.posts[current].post.QuotedPostUri.String) {
 				fmt.Printf("SKIPPING POST %s\n", buffer.posts[current].post.Uri)
@@ -69,7 +65,7 @@ func (buffer *postBuffer) pushPost(post goodStuffQueryRow, rowNum int) bufferEnt
 				current = (current + 1) % len(buffer.posts)
 			}
 			if current == buffer.nextIndex {
-				break;
+				break
 			}
 		}
 	}

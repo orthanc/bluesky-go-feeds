@@ -28,7 +28,7 @@ type Database struct {
 }
 
 type median struct {
-	values  []int64
+	values []int64
 }
 
 func newMedian() *median {
@@ -57,7 +57,6 @@ func init() {
 		},
 	})
 }
-
 
 func connect(ctx context.Context, extraParams string) (*sql.DB, error) {
 	dbLocation := os.Getenv("FEEDGEN_SQLITE_LOCATION")

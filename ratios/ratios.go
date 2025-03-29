@@ -80,29 +80,29 @@ func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) error 
 	if cap(ratios.authorMedianUpdates) < len(batch) {
 		ratios.authorMedianUpdates = make([]updateAuthorMediansParams, len(batch))
 	} else {
-		ratios.authorMedianUpdates = ratios.authorMedianUpdates[:len(batch)];
+		ratios.authorMedianUpdates = ratios.authorMedianUpdates[:len(batch)]
 	}
-	var index int;
+	var index int
 	for _, did := range batch {
-		ratios.authorMedianUpdates[index].did = did;
-		countRow := ratios.database.QueryRowContext(ctx, "select count(*) from post where author = ?", did);
-		err := countRow.Scan(&ratios.authorMedianUpdates[index].postCount);
+		ratios.authorMedianUpdates[index].did = did
+		countRow := ratios.database.QueryRowContext(ctx, "select count(*) from post where author = ?", did)
+		err := countRow.Scan(&ratios.authorMedianUpdates[index].postCount)
 		if err != nil {
-			return fmt.Errorf("error calculating author post count: %s", err);
+			return fmt.Errorf("error calculating author post count: %s", err)
 		}
 
 		if ratios.authorMedianUpdates[index].postCount == 0 {
-			ratios.authorMedianUpdates[index].medianInteractionCount = 0;
+			ratios.authorMedianUpdates[index].medianInteractionCount = 0
 		} else {
-			midPoint := int64(ratios.authorMedianUpdates[index].postCount / 2);
-			interactionRow := ratios.database.QueryRowContext(ctx, "select interactionCount from post where author = ? order by interactionCount limit ? offset ?", did, 1, midPoint);
-			err := interactionRow.Scan(&ratios.authorMedianUpdates[index].medianInteractionCount);
+			midPoint := int64(ratios.authorMedianUpdates[index].postCount / 2)
+			interactionRow := ratios.database.QueryRowContext(ctx, "select interactionCount from post where author = ? order by interactionCount limit ? offset ?", did, 1, midPoint)
+			err := interactionRow.Scan(&ratios.authorMedianUpdates[index].medianInteractionCount)
 			if err != nil {
-				return fmt.Errorf("error calculating author median interaction count: %s", err);
+				return fmt.Errorf("error calculating author median interaction count: %s", err)
 			}
 		}
 	}
-	return nil;
+	return nil
 }
 
 type updateInteractionRationParam struct {

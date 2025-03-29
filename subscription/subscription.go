@@ -20,21 +20,21 @@ import (
 type JetstreamEventListener func(context.Context, *models.Event, string) error
 
 type ProcessingRun struct {
-	Timestamp time.Time
-	Events int
-	ProcessingTime time.Duration
+	Timestamp       time.Time
+	Events          int
+	ProcessingTime  time.Duration
 	EventsPerSecond float64
-	LastEventTime time.Time
-	CaughtUp time.Duration
-	LagTime time.Duration
-	ToCatchUp time.Duration
+	LastEventTime   time.Time
+	CaughtUp        time.Duration
+	LagTime         time.Duration
+	ToCatchUp       time.Duration
 }
 
 type ProcessingStats struct {
-	runs [3000]ProcessingRun
-	end int
+	runs  [3000]ProcessingRun
+	end   int
 	start int
-	lock *sync.RWMutex
+	lock  *sync.RWMutex
 }
 
 func NewProcessingStats() *ProcessingStats {
@@ -54,14 +54,13 @@ func (status *ProcessingStats) Push(run *ProcessingRun) {
 	}
 }
 
-func (status *ProcessingStats) Iterate(cb func (run *ProcessingRun)) {
+func (status *ProcessingStats) Iterate(cb func(run *ProcessingRun)) {
 	status.lock.RLock()
 	defer status.lock.RUnlock()
 	for i := status.start; i != status.end; i = (i + 1) % len(status.runs) {
 		cb(&status.runs[i])
 	}
 }
-
 
 func SubscribeJetstream(ctx context.Context, serverAddr string, database *database.Database, listeners map[string]JetstreamEventListener, pauser *pauser.Pauser, stats *ProcessingStats) error {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -73,11 +72,10 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 	config := client.DefaultClientConfig()
 	config.WebsocketURL = serverAddr
 	config.Compress = true
-	
-	for collection, _ := range listeners {
+
+	for collection := range listeners {
 		config.WantedCollections = append(config.WantedCollections, collection)
 	}
-
 
 	cursorResult, err := database.Queries.GetCursor(ctx, "jetstream")
 	cursor := time.Now().Add(5 * -time.Minute).UnixMicro()
@@ -92,7 +90,7 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 	eventCountSinceSync := 0
 	windowStart := time.Now().UTC().UnixMilli()
 	var lastEvtTime int64 = 0
-	scheduler := sequentiial.NewScheduler("feed_generator", logger, func (ctx context.Context, event *models.Event) error {
+	scheduler := sequentiial.NewScheduler("feed_generator", logger, func(ctx context.Context, event *models.Event) error {
 		if event.Commit != nil {
 			listener := listeners[event.Commit.Collection]
 			err := listener(ctx, event, fmt.Sprintf("at://%s/%s/%s", event.Did, event.Commit.Collection, event.Commit.RKey))
@@ -118,14 +116,14 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 					toCatchUp = time.Duration(timeSpent*lagTime/caughtUp) * time.Millisecond
 				}
 				eventStats := ProcessingRun{
-					Timestamp: now,
-					Events: eventCountSinceSync,
-					ProcessingTime:time.Duration(timeSpent)*time.Millisecond,
-					EventsPerSecond: 1000.0*float64(eventCountSinceSync)/float64(timeSpent),
-					LastEventTime: parsedTime,
-					CaughtUp: time.Duration(caughtUp)*time.Millisecond,
-					LagTime: time.Duration(lagTime)*time.Millisecond,
-					ToCatchUp: toCatchUp,
+					Timestamp:       now,
+					Events:          eventCountSinceSync,
+					ProcessingTime:  time.Duration(timeSpent) * time.Millisecond,
+					EventsPerSecond: 1000.0 * float64(eventCountSinceSync) / float64(timeSpent),
+					LastEventTime:   parsedTime,
+					CaughtUp:        time.Duration(caughtUp) * time.Millisecond,
+					LagTime:         time.Duration(lagTime) * time.Millisecond,
+					ToCatchUp:       toCatchUp,
 				}
 				fmt.Printf(
 					"Processed %d events in %s (%f evts/s), %s caughtUp %s, %s behind, %s to catch up)\n",
@@ -140,16 +138,16 @@ func SubscribeJetstream(ctx context.Context, serverAddr string, database *databa
 				stats.Push(&eventStats)
 				if lagTime > 60000 {
 					pauser.Pause()
-				} else if (lagTime < 15000) {
+				} else if lagTime < 15000 {
 					pauser.Unpause()
-				}	
+				}
 				windowStart = windowEnd
 				lastEvtTime = evtTime
 				eventCountSinceSync = 0
 			}
 		}
 		cursor = event.TimeUS
-	
+
 		return nil
 	})
 

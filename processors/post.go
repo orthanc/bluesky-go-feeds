@@ -44,28 +44,28 @@ func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
 
 func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *writeSchema.Queries, postUris []string) error {
 	if len(postUris) == 0 {
-		return nil;
+		return nil
 	}
-	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris);
+	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris)
 	if err != nil {
-		return err;
+		return err
 	}
-	var urisToFetch []string;
+	var urisToFetch []string
 	for _, postUri := range postUris {
 		index := slices.IndexFunc(existingPosts, func(post read.GetPostsByUriRow) bool {
-			return post.Uri == postUri;
+			return post.Uri == postUri
 		})
 		if index == -1 {
-			urisToFetch = append(urisToFetch, postUri);
+			urisToFetch = append(urisToFetch, postUri)
 		}
 	}
 	if len(urisToFetch) == 0 {
-		return nil;
+		return nil
 	}
 
-	fetchedPosts, err := bsky.FeedGetPosts(ctx, processor.PublicClient, urisToFetch);
+	fetchedPosts, err := bsky.FeedGetPosts(ctx, processor.PublicClient, urisToFetch)
 	if err != nil {
-		return err;
+		return err
 	}
 	for _, post := range fetchedPosts.Posts {
 		postRecord := post.Record.Val.(*bsky.FeedPost)
@@ -85,7 +85,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *w
 			if post.Embed.EmbedExternal_View != nil && post.Embed.EmbedExternal_View.External != nil {
 				externalUri = post.Embed.EmbedExternal_View.External.Uri
 			}
-			if post.Embed.EmbedRecord_View != nil && post.Embed.EmbedRecord_View.Record != nil && post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord != nil{
+			if post.Embed.EmbedRecord_View != nil && post.Embed.EmbedRecord_View.Record != nil && post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord != nil {
 				quotedPostUri = post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord.Uri
 			}
 			if post.Embed.EmbedRecordWithMedia_View != nil && post.Embed.EmbedRecordWithMedia_View.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord != nil {
@@ -93,10 +93,10 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *w
 			}
 		}
 
-		rawCreatedAt := postRecord.CreatedAt;
-		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, post.Author.Did);
+		rawCreatedAt := postRecord.CreatedAt
+		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, post.Author.Did)
 		if skip {
-			continue;
+			continue
 		}
 		err := updates.SavePost(ctx, writeSchema.SavePostParams{
 			Uri:               post.Uri,
@@ -119,7 +119,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, updates *w
 			return err
 		}
 	}
-	return nil;
+	return nil
 }
 
 func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
@@ -132,7 +132,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
-		var referencedPosts []string;
+		var referencedPosts []string
 		if post.Reply != nil {
 			if post.Reply.Parent != nil {
 				replyParent = post.Reply.Parent.Uri
@@ -141,7 +141,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
-				referencedPosts = append(referencedPosts, replyParent);
+				referencedPosts = append(referencedPosts, replyParent)
 			}
 		}
 
@@ -151,11 +151,11 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			}
 			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecord.Record.Uri
-				referencedPosts = append(referencedPosts, quotedPostUri);
+				referencedPosts = append(referencedPosts, quotedPostUri)
 			}
 			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
-				referencedPosts = append(referencedPosts, quotedPostUri);
+				referencedPosts = append(referencedPosts, quotedPostUri)
 			}
 		}
 
@@ -179,9 +179,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			return nil
 		}
 		rawCreatedAt := post.CreatedAt
-		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, event.Did);
+		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, event.Did)
 		if skip {
-			return nil;
+			return nil
 		}
 
 		updates, tx, err := processor.Database.BeginTx(ctx)

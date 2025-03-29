@@ -163,7 +163,7 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, stage := range []string{processor.StageIncubating, processor.StagePreInfectious, processor.StageInfectious, processor.StagePostInfectious, processor.StageImmune} {
 		var cnt int64 = 0
 		index := slices.IndexFunc(postersMadnessStats, func(stat read.PostersMadnessStat) bool {
-			return stat.Stage == stage;
+			return stat.Stage == stage
 		})
 		if index != -1 {
 			cnt = postersMadnessStats[index].Cnt.(int64)
