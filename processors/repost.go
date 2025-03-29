@@ -13,7 +13,7 @@ import (
 
 type RepostProcessor struct {
 	Database     *database.Database
-	PostUrisChan chan string
+	PostUrisChan chan ReferencedPost
 }
 
 func (processor *RepostProcessor) Process(ctx context.Context, event *models.Event, repostUri string) error {
@@ -47,7 +47,10 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 		}
 
 		if interest.RepostByAuthor > 0 {
-			processor.PostUrisChan <- postUri
+			processor.PostUrisChan <- ReferencedPost{
+				PostUri:           postUri,
+				SourceEventAuthor: event.Did,
+			}
 		}
 
 		updates, tx, err := processor.Database.BeginTx(ctx)

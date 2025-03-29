@@ -15,15 +15,20 @@ import (
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
 )
 
+type ReferencedPost struct {
+	PostUri           string
+	SourceEventAuthor string
+}
+
 type PostProcessor struct {
 	Database     *database.Database
 	PublicClient *xrpc.Client
-	PostUrisChan chan string
+	PostUrisChan chan ReferencedPost
 }
 
 func NewPostProcessor(Database *database.Database,
 	PublicClient *xrpc.Client) *PostProcessor {
-	PostUrisChan := make(chan string, 100)
+	PostUrisChan := make(chan ReferencedPost, 100)
 	processor := PostProcessor{
 		Database:     Database,
 		PublicClient: PublicClient,
@@ -54,7 +59,13 @@ func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
 	return false, indexedAtDate
 }
 
-func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris []string) error {
+func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referencedPosts []ReferencedPost) error {
+	postUris := make([]string, 0, len(referencedPosts))
+	sourceEventAuthorByPost := make(map[string]string)
+	for _, referencedPost := range referencedPosts {
+		postUris = append(postUris, referencedPost.PostUri)
+		sourceEventAuthorByPost[referencedPost.PostUri] = referencedPost.SourceEventAuthor
+	}
 	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris)
 	if err != nil {
 		return err
@@ -112,6 +123,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris [
 		if skip {
 			continue
 		}
+		indexedAt := indexedAtDate.Format(time.RFC3339)
 		err := updates.SavePost(ctx, writeSchema.SavePostParams{
 			Uri:               post.Uri,
 			Author:            post.Author.Did,
@@ -119,7 +131,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris [
 			ReplyParentAuthor: database.ToNullString(replyParentAuthor),
 			ReplyRoot:         database.ToNullString(replyRoot),
 			ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
-			IndexedAt:         indexedAtDate.Format(time.RFC3339),
+			IndexedAt:         indexedAt,
 			CreatedAt:         database.ToNullString(rawCreatedAt),
 			DirectReplyCount:  0,
 			InteractionCount:  0,
@@ -131,19 +143,31 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris [
 		if err != nil {
 			return err
 		}
+
+		if externalUri != "" {
+				err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
+				LinkUri:    externalUri,
+				SeenAt:     indexedAt,
+				PostUri:    post.Uri,
+				PostAuthor: sourceEventAuthorByPost[post.Uri],
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 	tx.Commit()
 	return nil
 }
 
 func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
-	for uri := range processor.PostUrisChan {
-		batch := []string{uri}
+	for referencedPost := range processor.PostUrisChan {
+		batch := []ReferencedPost{referencedPost}
 	LOOP:
 		for len(batch) < 25 {
 			select {
-			case uri = <-processor.PostUrisChan:
-				batch = append(batch, uri)
+			case referencedPost = <-processor.PostUrisChan:
+				batch = append(batch, referencedPost)
 			default:
 				break LOOP
 			}
@@ -217,7 +241,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 
 		for _, uri := range referencedPosts {
-			processor.PostUrisChan <- uri
+			processor.PostUrisChan <- ReferencedPost{
+				PostUri:           uri,
+				SourceEventAuthor: event.Did,
+			}
 		}
 
 		updates, tx, err := processor.Database.BeginTx(ctx)
