@@ -2,7 +2,6 @@ package processor
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -17,21 +16,18 @@ import (
 )
 
 type PostProcessor struct {
-	Database       *database.Database
-	PostersMadness *PostersMadness
-	PublicClient   *xrpc.Client
-	PostUrisChan   chan string
+	Database     *database.Database
+	PublicClient *xrpc.Client
+	PostUrisChan chan string
 }
 
 func NewPostProcessor(Database *database.Database,
-	PostersMadness *PostersMadness,
 	PublicClient *xrpc.Client) *PostProcessor {
 	PostUrisChan := make(chan string, 100)
 	processor := PostProcessor{
-		Database:       Database,
-		PostersMadness: PostersMadness,
-		PublicClient:   PublicClient,
-		PostUrisChan:   PostUrisChan,
+		Database:     Database,
+		PublicClient: PublicClient,
+		PostUrisChan: PostUrisChan,
 	}
 
 	go processor.batchEnsurePostsSaved(context.Background())
@@ -129,7 +125,6 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, postUris [
 			InteractionCount:  0,
 			LikeCount:         0,
 			ReplyCount:        0,
-			PostersMadness:    sql.NullInt64{Int64: 0, Valid: false},
 			ExternalUri:       database.ToNullString(externalUri),
 			QuotedPostUri:     database.ToNullString(quotedPostUri),
 		})
@@ -212,8 +207,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			interest.ReplyToAuthor > 0 ||
 			interest.ReplyToUser > 0 ||
 			interest.ReplyToThreadAuthor > 0 ||
-			interest.ReplyToThreadUser > 0 ||
-			interest.PostersMadnessSymptomatic > 0) {
+			interest.ReplyToThreadUser > 0) {
 			return nil
 		}
 		rawCreatedAt := post.CreatedAt
@@ -233,7 +227,7 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		defer tx.Rollback()
 
 		indexedAt := indexedAtDate.Format(time.RFC3339)
-		if interest.PostByAuthor > 0 || interest.PostersMadnessSymptomatic > 0 {
+		if interest.PostByAuthor > 0 {
 			postIndexedAt := indexedAtDate
 			// if event.Did == replyParentAuthor && event.Did == replyRootAuthor {
 			// 	parentPostDates, _ := processor.Database.Queries.GetPostDates(ctx, replyParent)
@@ -248,10 +242,6 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			// 		}
 			// 	}
 			// }
-			var posters_madness int64 = 0
-			if interest.PostersMadnessSymptomatic > 0 && (replyParentAuthor == "" || interest.PostersMadnessReplyToSymptomatic > 0) {
-				posters_madness = 1
-			}
 			err := updates.SavePost(ctx, writeSchema.SavePostParams{
 				Uri:               postUri,
 				Author:            event.Did,
@@ -265,7 +255,6 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 				InteractionCount:  0,
 				LikeCount:         0,
 				ReplyCount:        0,
-				PostersMadness:    sql.NullInt64{Int64: posters_madness, Valid: true},
 				ExternalUri:       database.ToNullString(externalUri),
 				QuotedPostUri:     database.ToNullString(quotedPostUri),
 			})

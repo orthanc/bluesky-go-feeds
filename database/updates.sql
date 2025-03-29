@@ -357,28 +357,3 @@ delete from list_membership
 where
   list_uri = ?
   and last_recorded < ?;
-
--- name: SavePostersMadness :exec
-insert into
-  posters_madness (poster_did, stage, last_checked)
-values
-  (?, ?, ?) on conflict do nothing;
-
--- name: UpdatePostersMadnessStage :exec
-update posters_madness
-set
-  stage = ?,
-  last_checked = ?
-where
-  poster_did = ?;
-
--- name: DeletePostersMadness :exec
-delete from posters_madness
-where
-  poster_did = ?;
-
--- name: SavePostersMadnessLog :exec
-insert into
-  posters_madness_log (recorded_at, poster_did, stage, comment)
-values
-  (?, ?, ?, ?);

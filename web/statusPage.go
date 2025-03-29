@@ -1,16 +1,12 @@
 package web
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/orthanc/feedgenerator/database"
-	"github.com/orthanc/feedgenerator/database/read"
-	processor "github.com/orthanc/feedgenerator/processors"
 	"github.com/orthanc/feedgenerator/subscription"
 )
 
@@ -26,10 +22,6 @@ const pageTemplate = `
 		</div>
 		<div style="max-width: 800px; padding: 1rem;">
 			<canvas id="lagTimeChart"></canvas>
-		</div>
-		<h1>Posters madness</h1>
-		<div>
-			<ul>%s</ul>
 		</div>
 
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@^3"></script>
@@ -152,29 +144,6 @@ func (handler StatusPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	postersMadnessStats, err := handler.database.Queries.GetPostersMadnessStats(context.Background())
-	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(fmt.Sprintf("%s", err)))
-		return
-	}
-	statsBlock := ""
-	var count int64 = 0
-	for _, stage := range []string{processor.StageIncubating, processor.StagePreInfectious, processor.StageInfectious, processor.StagePostInfectious, processor.StageImmune} {
-		var cnt int64 = 0
-		index := slices.IndexFunc(postersMadnessStats, func(stat read.PostersMadnessStat) bool {
-			return stat.Stage == stage
-		})
-		if index != -1 {
-			cnt = postersMadnessStats[index].Cnt.(int64)
-		}
-		if stage != processor.StageImmune {
-			count += cnt
-		}
-		statsBlock += fmt.Sprintf("<li><b>%s</b>: %d</li>", stage, cnt)
-	}
-	statsBlock += fmt.Sprintf("<li><b>TOTAL</b>: %d</li>", count)
-
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(fmt.Sprintf(pageTemplate, statsBlock, string(jsonData))))
+	w.Write([]byte(fmt.Sprintf(pageTemplate, string(jsonData))))
 }

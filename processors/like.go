@@ -15,7 +15,6 @@ import (
 
 type LikeProcessor struct {
 	Database       *database.Database
-	PostersMadness *PostersMadness
 	likeInProgress bsky.FeedLike
 	interest       read.GetLikeFollowDataRow
 }
