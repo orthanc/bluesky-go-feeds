@@ -11,7 +11,7 @@ func getAuthorFromPostUri(postUri string) string {
 	}
 	repo := parts[2]
 	collection := parts[3]
-	if collection == "app.bsky.feed.post" {
+	if collection != "app.bsky.feed.post" {
 		return ""
 	}
 	return repo

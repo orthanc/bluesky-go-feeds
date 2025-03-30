@@ -16,8 +16,9 @@ import (
 )
 
 type ReferencedPostType = int64
+
 const (
-	RootPost     ReferencedPostType = iota
+	RootPost ReferencedPostType = iota
 	QuotedPost
 	RepostedPost
 )
@@ -69,7 +70,8 @@ func safeIndexedAt(rawCreatedAt string, authorDid string) (bool, time.Time) {
 	return false, indexedAtDate
 }
 
-func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referencedPosts []ReferencedPost) error {
+func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referencedPosts []ReferencedPost) ([]ReferencedPost, error) {
+	var additionalPostsToResolve []ReferencedPost
 	postUris := make([]string, 0, len(referencedPosts))
 	referencedPostsByUri := make(map[string]ReferencedPost)
 	for _, referencedPost := range referencedPosts {
@@ -78,7 +80,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 	}
 	existingPosts, err := processor.Database.Queries.GetPostsByUri(ctx, postUris)
 	if err != nil {
-		return err
+		return additionalPostsToResolve, err
 	}
 	var urisToFetch []string
 	for _, postUri := range postUris {
@@ -89,93 +91,92 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 			urisToFetch = append(urisToFetch, postUri)
 		}
 	}
-	if len(urisToFetch) == 0 {
-		return nil
+	var fetchedPosts *bsky.FeedGetPosts_Output
+	if len(urisToFetch) > 0 {
+		fetchedPosts, err = bsky.FeedGetPosts(ctx, processor.PublicClient, urisToFetch)
+		if err != nil {
+			return additionalPostsToResolve, err
+		}
 	}
-
-	fetchedPosts, err := bsky.FeedGetPosts(ctx, processor.PublicClient, urisToFetch)
-	if err != nil {
-		return err
-	}
-	var additionalPostsToResolve []ReferencedPost
 	updates, tx, err := processor.Database.BeginTx(ctx)
 	if err != nil {
-		return err
+		return additionalPostsToResolve, err
 	}
-
 	defer tx.Rollback()
-	for _, post := range fetchedPosts.Posts {
-		postRecord := post.Record.Val.(*bsky.FeedPost)
-		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
-		if postRecord.Reply != nil {
-			if postRecord.Reply.Parent != nil {
-				replyParent = postRecord.Reply.Parent.Uri
-				replyParentAuthor = getAuthorFromPostUri(replyParent)
+	if fetchedPosts != nil {
+		for _, post := range fetchedPosts.Posts {
+			postRecord := post.Record.Val.(*bsky.FeedPost)
+			var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
+			if postRecord.Reply != nil {
+				if postRecord.Reply.Parent != nil {
+					replyParent = postRecord.Reply.Parent.Uri
+					replyParentAuthor = getAuthorFromPostUri(replyParent)
+				}
+				if postRecord.Reply.Root != nil {
+					replyRoot = postRecord.Reply.Root.Uri
+					replyRootAuthor = getAuthorFromPostUri(replyRoot)
+				}
 			}
-			if postRecord.Reply.Root != nil {
-				replyRoot = postRecord.Reply.Root.Uri
-				replyRootAuthor = getAuthorFromPostUri(replyRoot)
-			}
-		}
 
-		if post.Embed != nil {
-			if post.Embed.EmbedExternal_View != nil && post.Embed.EmbedExternal_View.External != nil {
-				externalUri = post.Embed.EmbedExternal_View.External.Uri
+			if post.Embed != nil {
+				if post.Embed.EmbedExternal_View != nil && post.Embed.EmbedExternal_View.External != nil {
+					externalUri = post.Embed.EmbedExternal_View.External.Uri
+				}
+				if post.Embed.EmbedRecord_View != nil && post.Embed.EmbedRecord_View.Record != nil && post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord != nil && getAuthorFromPostUri(post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord.Uri) != "" {
+					quotedPostUri = post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord.Uri
+				}
+				if post.Embed.EmbedRecordWithMedia_View != nil && post.Embed.EmbedRecordWithMedia_View.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord != nil && getAuthorFromPostUri(post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord.Uri) != "" {
+					quotedPostUri = post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord.Uri
+				}
 			}
-			if post.Embed.EmbedRecord_View != nil && post.Embed.EmbedRecord_View.Record != nil && post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord != nil {
-				quotedPostUri = post.Embed.EmbedRecord_View.Record.EmbedRecord_ViewRecord.Uri
-			}
-			if post.Embed.EmbedRecordWithMedia_View != nil && post.Embed.EmbedRecordWithMedia_View.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord != nil {
-				quotedPostUri = post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord.Uri
-			}
-		}
-		
-		referenceType := referencedPostsByUri[post.Uri].ReferenceType;
-		if quotedPostUri != "" && (referenceType == RepostedPost || referenceType == RootPost) {
-			additionalPostsToResolve = append(additionalPostsToResolve, ReferencedPost{
-				PostUri:           quotedPostUri,
-				SourceEventAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
-				SourceIndexedAt:   referencedPostsByUri[post.Uri].SourceIndexedAt,
-				SourcePostUri:     referencedPostsByUri[post.Uri].SourcePostUri,
-				ReferenceType:     QuotedPost,
-			})
-		}
 
-		rawCreatedAt := postRecord.CreatedAt
-		skip, indexedAtDate := safeIndexedAt(rawCreatedAt, post.Author.Did)
-		if skip {
-			continue
-		}
-		indexedAt := indexedAtDate.Format(time.RFC3339)
-		err := updates.SavePost(ctx, writeSchema.SavePostParams{
-			Uri:               post.Uri,
-			Author:            post.Author.Did,
-			ReplyParent:       database.ToNullString(replyParent),
-			ReplyParentAuthor: database.ToNullString(replyParentAuthor),
-			ReplyRoot:         database.ToNullString(replyRoot),
-			ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
-			IndexedAt:         indexedAt,
-			CreatedAt:         database.ToNullString(rawCreatedAt),
-			DirectReplyCount:  0,
-			InteractionCount:  0,
-			LikeCount:         0,
-			ReplyCount:        0,
-			ExternalUri:       database.ToNullString(externalUri),
-			QuotedPostUri:     database.ToNullString(quotedPostUri),
-		})
-		if err != nil {
-			return err
-		}
+			referenceType := referencedPostsByUri[post.Uri].ReferenceType
+			if quotedPostUri != "" && (referenceType == RepostedPost || referenceType == RootPost) {
+				additionalPostsToResolve = append(additionalPostsToResolve, ReferencedPost{
+					PostUri:           quotedPostUri,
+					SourceEventAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+					SourceIndexedAt:   referencedPostsByUri[post.Uri].SourceIndexedAt,
+					SourcePostUri:     referencedPostsByUri[post.Uri].SourcePostUri,
+					ReferenceType:     QuotedPost,
+				})
+			}
 
-		if externalUri != "" {
-			err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
-				LinkUri:    externalUri,
-				SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
-				PostUri:    referencedPostsByUri[post.Uri].SourcePostUri,
-				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+			rawCreatedAt := postRecord.CreatedAt
+			skip, indexedAtDate := safeIndexedAt(rawCreatedAt, post.Author.Did)
+			if skip {
+				continue
+			}
+			indexedAt := indexedAtDate.Format(time.RFC3339)
+			err := updates.SavePost(ctx, writeSchema.SavePostParams{
+				Uri:               post.Uri,
+				Author:            post.Author.Did,
+				ReplyParent:       database.ToNullString(replyParent),
+				ReplyParentAuthor: database.ToNullString(replyParentAuthor),
+				ReplyRoot:         database.ToNullString(replyRoot),
+				ReplyRootAuthor:   database.ToNullString(replyRootAuthor),
+				IndexedAt:         indexedAt,
+				CreatedAt:         database.ToNullString(rawCreatedAt),
+				DirectReplyCount:  0,
+				InteractionCount:  0,
+				LikeCount:         0,
+				ReplyCount:        0,
+				ExternalUri:       database.ToNullString(externalUri),
+				QuotedPostUri:     database.ToNullString(quotedPostUri),
 			})
 			if err != nil {
-				return err
+				return additionalPostsToResolve, err
+			}
+
+			if externalUri != "" {
+				err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
+					LinkUri:    externalUri,
+					SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
+					PostUri:    referencedPostsByUri[post.Uri].SourcePostUri,
+					PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+				})
+				if err != nil {
+					return additionalPostsToResolve, err
+				}
 			}
 		}
 	}
@@ -188,12 +189,12 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
 			})
 			if err != nil {
-				return err
+				return additionalPostsToResolve, err
 			}
 		}
 
-		referenceType := referencedPostsByUri[post.Uri].ReferenceType;
-		if post.QuotedPostUri.Valid && (referenceType == RepostedPost || referenceType == RootPost) {
+		referenceType := referencedPostsByUri[post.Uri].ReferenceType
+		if post.QuotedPostUri.Valid && getAuthorFromPostUri(post.QuotedPostUri.String) != "" && (referenceType == RepostedPost || referenceType == RootPost) {
 			additionalPostsToResolve = append(additionalPostsToResolve, ReferencedPost{
 				PostUri:           post.QuotedPostUri.String,
 				SourceEventAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
@@ -205,28 +206,29 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 	}
 	tx.Commit()
 
-	for _, reference := range additionalPostsToResolve {
-		processor.PostUrisChan <- reference
-	}
-	return nil
+	return additionalPostsToResolve, nil
 }
 
 func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
-	for referencedPost := range processor.PostUrisChan {
-		batch := []ReferencedPost{referencedPost}
+	var batch []ReferencedPost
+	for {
+		if len(batch) == 0 {
+			batch = append(batch, <-processor.PostUrisChan)
+		}
 	LOOP:
 		for len(batch) < 25 {
 			select {
-			case referencedPost = <-processor.PostUrisChan:
+			case referencedPost := <-processor.PostUrisChan:
 				batch = append(batch, referencedPost)
 			default:
 				break LOOP
 			}
 		}
-		err := processor.ensurePostsSaved(ctx, batch)
+		additionalPostsToResolve, err := processor.ensurePostsSaved(ctx, batch)
 		if err != nil {
 			fmt.Printf("Error saving post batch %e\n", err)
 		}
+		batch = append(batch[:0], additionalPostsToResolve...)
 	}
 }
 
@@ -255,10 +257,10 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Embed.EmbedExternal != nil && post.Embed.EmbedExternal.External != nil {
 				externalUri = post.Embed.EmbedExternal.External.Uri
 			}
-			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
+			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil && getAuthorFromPostUri(post.Embed.EmbedRecord.Record.Uri) != "" {
 				quotedPostUri = post.Embed.EmbedRecord.Record.Uri
 			}
-			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
+			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil && getAuthorFromPostUri(post.Embed.EmbedRecordWithMedia.Record.Record.Uri) != "" {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
 			}
 		}
