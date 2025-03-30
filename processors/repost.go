@@ -52,6 +52,8 @@ func (processor *RepostProcessor) Process(ctx context.Context, event *models.Eve
 				PostUri:           postUri,
 				SourceEventAuthor: event.Did,
 				SourceIndexedAt:   time.Now().UTC().Format(time.RFC3339),
+				SourcePostUri:     postUri,
+				ReferenceType:     RepostedPost,
 			}
 		}
 

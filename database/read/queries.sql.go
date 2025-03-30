@@ -310,7 +310,8 @@ const getPostsByUri = `-- name: GetPostsByUri :many
 select
   uri,
   "indexedAt",
-  external_uri
+  external_uri,
+  quoted_post_uri
 from
   post
 where
@@ -318,9 +319,10 @@ where
 `
 
 type GetPostsByUriRow struct {
-	Uri         string
-	IndexedAt   string
-	ExternalUri sql.NullString
+	Uri           string
+	IndexedAt     string
+	ExternalUri   sql.NullString
+	QuotedPostUri sql.NullString
 }
 
 func (q *Queries) GetPostsByUri(ctx context.Context, uris []string) ([]GetPostsByUriRow, error) {
@@ -342,7 +344,12 @@ func (q *Queries) GetPostsByUri(ctx context.Context, uris []string) ([]GetPostsB
 	var items []GetPostsByUriRow
 	for rows.Next() {
 		var i GetPostsByUriRow
-		if err := rows.Scan(&i.Uri, &i.IndexedAt, &i.ExternalUri); err != nil {
+		if err := rows.Scan(
+			&i.Uri,
+			&i.IndexedAt,
+			&i.ExternalUri,
+			&i.QuotedPostUri,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

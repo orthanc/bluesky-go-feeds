@@ -15,10 +15,19 @@ import (
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
 )
 
+type ReferencedPostType = int64
+const (
+	RootPost     ReferencedPostType = iota
+	QuotedPost
+	RepostedPost
+)
+
 type ReferencedPost struct {
 	PostUri           string
+	SourcePostUri     string
 	SourceEventAuthor string
 	SourceIndexedAt   string
+	ReferenceType     ReferencedPostType
 }
 
 type PostProcessor struct {
@@ -88,10 +97,12 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 	if err != nil {
 		return err
 	}
+	var additionalPostsToResolve []ReferencedPost
 	updates, tx, err := processor.Database.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
+
 	defer tx.Rollback()
 	for _, post := range fetchedPosts.Posts {
 		postRecord := post.Record.Val.(*bsky.FeedPost)
@@ -117,6 +128,17 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 			if post.Embed.EmbedRecordWithMedia_View != nil && post.Embed.EmbedRecordWithMedia_View.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record != nil && post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord != nil {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia_View.Record.Record.EmbedRecord_ViewRecord.Uri
 			}
+		}
+		
+		referenceType := referencedPostsByUri[post.Uri].ReferenceType;
+		if quotedPostUri != "" && (referenceType == RepostedPost || referenceType == RootPost) {
+			additionalPostsToResolve = append(additionalPostsToResolve, ReferencedPost{
+				PostUri:           quotedPostUri,
+				SourceEventAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+				SourceIndexedAt:   referencedPostsByUri[post.Uri].SourceIndexedAt,
+				SourcePostUri:     referencedPostsByUri[post.Uri].SourcePostUri,
+				ReferenceType:     QuotedPost,
+			})
 		}
 
 		rawCreatedAt := postRecord.CreatedAt
@@ -149,7 +171,7 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 			err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
 				LinkUri:    externalUri,
 				SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
-				PostUri:    post.Uri,
+				PostUri:    referencedPostsByUri[post.Uri].SourcePostUri,
 				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
 			})
 			if err != nil {
@@ -162,15 +184,30 @@ func (processor *PostProcessor) ensurePostsSaved(ctx context.Context, referenced
 			err := updates.SaveUserLink(ctx, writeSchema.SaveUserLinkParams{
 				LinkUri:    post.ExternalUri.String,
 				SeenAt:     referencedPostsByUri[post.Uri].SourceIndexedAt,
-				PostUri:    post.Uri,
+				PostUri:    referencedPostsByUri[post.Uri].SourcePostUri,
 				PostAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
 			})
 			if err != nil {
 				return err
 			}
 		}
+
+		referenceType := referencedPostsByUri[post.Uri].ReferenceType;
+		if post.QuotedPostUri.Valid && (referenceType == RepostedPost || referenceType == RootPost) {
+			additionalPostsToResolve = append(additionalPostsToResolve, ReferencedPost{
+				PostUri:           post.QuotedPostUri.String,
+				SourceEventAuthor: referencedPostsByUri[post.Uri].SourceEventAuthor,
+				SourceIndexedAt:   referencedPostsByUri[post.Uri].SourceIndexedAt,
+				SourcePostUri:     referencedPostsByUri[post.Uri].SourcePostUri,
+				ReferenceType:     QuotedPost,
+			})
+		}
 	}
 	tx.Commit()
+
+	for _, reference := range additionalPostsToResolve {
+		processor.PostUrisChan <- reference
+	}
 	return nil
 }
 
@@ -203,7 +240,6 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
-		var referencedPosts []string
 		if post.Reply != nil {
 			if post.Reply.Parent != nil {
 				replyParent = post.Reply.Parent.Uri
@@ -212,7 +248,6 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			if post.Reply.Root != nil {
 				replyRoot = post.Reply.Root.Uri
 				replyRootAuthor = getAuthorFromPostUri(replyRoot)
-				referencedPosts = append(referencedPosts, replyRoot)
 			}
 		}
 
@@ -222,11 +257,9 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			}
 			if post.Embed.EmbedRecord != nil && post.Embed.EmbedRecord.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecord.Record.Uri
-				referencedPosts = append(referencedPosts, quotedPostUri)
 			}
 			if post.Embed.EmbedRecordWithMedia != nil && post.Embed.EmbedRecordWithMedia.Record != nil && post.Embed.EmbedRecordWithMedia.Record.Record != nil {
 				quotedPostUri = post.Embed.EmbedRecordWithMedia.Record.Record.Uri
-				referencedPosts = append(referencedPosts, quotedPostUri)
 			}
 		}
 
@@ -256,11 +289,22 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 		}
 		indexedAt := indexedAtDate.Format(time.RFC3339)
 
-		for _, uri := range referencedPosts {
+		if replyRoot != "" {
 			processor.PostUrisChan <- ReferencedPost{
-				PostUri:           uri,
+				PostUri:           replyRoot,
 				SourceEventAuthor: event.Did,
 				SourceIndexedAt:   indexedAt,
+				SourcePostUri:     postUri,
+				ReferenceType:     RootPost,
+			}
+		}
+		if quotedPostUri != "" {
+			processor.PostUrisChan <- ReferencedPost{
+				PostUri:           quotedPostUri,
+				SourceEventAuthor: event.Did,
+				SourceIndexedAt:   indexedAt,
+				SourcePostUri:     postUri,
+				ReferenceType:     QuotedPost,
 			}
 		}
 

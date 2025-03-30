@@ -32,7 +32,8 @@ where
 select
   uri,
   "indexedAt",
-  external_uri
+  external_uri,
+  quoted_post_uri
 from
   post
 where
