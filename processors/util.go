@@ -5,8 +5,8 @@ import (
 )
 
 func getAuthorFromPostUri(postUri string) string {
-	parts := strings.SplitN(postUri, "/", 4)
-	if len(parts) < 4 {
+	parts := strings.SplitN(postUri, "/", 5)
+	if len(parts) < 5 {
 		return ""
 	}
 	repo := parts[2]
