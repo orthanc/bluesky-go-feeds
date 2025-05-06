@@ -82,8 +82,7 @@ func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) error 
 	} else {
 		ratios.authorMedianUpdates = ratios.authorMedianUpdates[:len(batch)]
 	}
-	var index int
-	for _, did := range batch {
+	for index, did := range batch {
 		ratios.authorMedianUpdates[index].did = did
 		countRow := ratios.database.QueryRowContext(ctx, "select count(*) from post where author = ?", did)
 		err := countRow.Scan(&ratios.authorMedianUpdates[index].postCount)
@@ -91,7 +90,7 @@ func (ratios *Ratios) getAuthorStats(ctx context.Context, batch []string) error 
 			return fmt.Errorf("error calculating author post count: %s", err)
 		}
 
-		if ratios.authorMedianUpdates[index].postCount == 0 {
+		if ratios.authorMedianUpdates[index].postCount < 1 {
 			ratios.authorMedianUpdates[index].medianInteractionCount = 0
 		} else {
 			midPoint := int64(ratios.authorMedianUpdates[index].postCount / 2)
@@ -162,6 +161,7 @@ func (ratios *Ratios) updateAuthorBatch(ctx context.Context, batch []string) err
 			return err
 		}
 	}
+
 	tx.Commit()
 	return nil
 }
