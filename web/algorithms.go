@@ -17,6 +17,7 @@ var algorithms = map[string]algorithm{
 	goodStuffAlgorithmId:         goodStuff,
 	dedupedGoodStuffAlgorithmId:  dedupedGoodStuff,
 	loveliesAlgorithmId:          lovelies,
+	mutualExhaustionAlgorithmId:  mutualExhaustion,
 	quietPostersAlgorithmId:      quietPosters,
 	youMightLikeAlgorithmId:      youMightLike,
 	followerRouletteAlgorithmId:  followerRoulette,
