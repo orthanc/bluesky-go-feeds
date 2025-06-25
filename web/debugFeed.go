@@ -16,6 +16,7 @@ type debugQueryRow = struct {
 	Author    string
 }
 
+const followingAlgorithmId = "3lsfwcc73gdcf"
 const debugAlgorithmId = "replies-foll"
 
 const debugQuery = `

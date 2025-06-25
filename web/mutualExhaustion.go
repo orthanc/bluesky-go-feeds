@@ -11,9 +11,9 @@ import (
 )
 
 type mutualExhaustionQueryRow = struct {
-	Uri                  string
-	IndexedAt            string
-	InteractionCount     string
+	Uri              string
+	IndexedAt        string
+	InteractionCount string
 }
 
 const mutualExhaustionAlgorithmId = "3lpoa7sy3hfvj"

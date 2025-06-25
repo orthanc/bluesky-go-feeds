@@ -22,5 +22,6 @@ var algorithms = map[string]algorithm{
 	youMightLikeAlgorithmId:      youMightLike,
 	followerRouletteAlgorithmId:  followerRoulette,
 	followingRouletteAlgorithmId: followingRoulette,
+	followingAlgorithmId:         debugFeed,
 	debugAlgorithmId:             debugFeed,
 }
