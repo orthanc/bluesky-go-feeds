@@ -85,16 +85,12 @@ func main() {
 		return
 	}
 
-	client := xrpc.Client{
-		Host: "https://bsky.social",
-	}
 	publicClient := xrpc.Client{
 		Host: "https://public.api.bsky.app",
 	}
 	followFarmersList := os.Getenv("FOLLOW_FARMERS_LIST")
 	allFollowing := following.NewAllFollowing(
 		database,
-		&client,
 		&publicClient,
 		followFarmersList,
 	)
@@ -123,10 +119,10 @@ func main() {
 	}).Process
 	firehoseListeners["app.bsky.feed.post"] = postProcessor.Process
 	firehoseListeners["app.bsky.feed.like"] = (&processor.LikeProcessor{
-		Database:       database,
+		Database: database,
 	}).Process
 	firehoseListeners["app.bsky.feed.repost"] = (&processor.RepostProcessor{
-		Database: database,
+		Database:     database,
 		PostUrisChan: postProcessor.PostUrisChan,
 	}).Process
 	firehoseListeners["app.bsky.graph.listitem"] = processor.NewListItemProcessor(database, followFarmersList).Process

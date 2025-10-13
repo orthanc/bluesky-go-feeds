@@ -7,15 +7,14 @@ import (
 	"strings"
 
 	"github.com/bluesky-social/indigo/atproto/crypto"
-	"github.com/bluesky-social/indigo/atproto/identity"
 	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/orthanc/feedgenerator/following"
 )
 
 var Hostanme = os.Getenv("FEEDGEN_HOSTNAME")
 var ServiceDid = fmt.Sprintf("did:web:%s", Hostanme)
 var PublisherDid = os.Getenv("FEEDGEN_PUBLISHER_DID")
-var directory = identity.DefaultDirectory()
 
 type AtProtoSigningMethod struct {
 	alg string
@@ -56,7 +55,7 @@ func validateAuth(r *http.Request) (string, error) {
 
 	parsedToken, err := jwt.ParseWithClaims(token, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		did := syntax.DID(token.Claims.(jwt.MapClaims)["iss"].(string))
-		identity, err := directory.LookupDID(r.Context(), did)
+		identity, err := following.DidDirectory.LookupDID(r.Context(), did)
 		if err != nil {
 			return nil, fmt.Errorf("unable to resolve did %s: %s", did, err)
 		}

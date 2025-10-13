@@ -11,6 +11,8 @@ import (
 
 	"github.com/bluesky-social/indigo/api/atproto"
 	"github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/indigo/atproto/identity"
+	"github.com/bluesky-social/indigo/atproto/syntax"
 	"github.com/bluesky-social/indigo/xrpc"
 
 	"github.com/orthanc/feedgenerator/database"
@@ -18,9 +20,10 @@ import (
 	writeSchema "github.com/orthanc/feedgenerator/database/write"
 )
 
+var DidDirectory = identity.DefaultDirectory()
+
 type AllFollowing struct {
 	database            *database.Database
-	client              *xrpc.Client
 	publicClient        *xrpc.Client
 	followFarmerListUri string
 }
@@ -29,10 +32,9 @@ const purgePageSize = 10000
 
 var cutoverTime = time.Date(2024, 11, 13, 8, 45, 0, 0, time.UTC)
 
-func NewAllFollowing(database *database.Database, client *xrpc.Client, publicClient *xrpc.Client, followFarmerListUri string) *AllFollowing {
+func NewAllFollowing(database *database.Database, publicClient *xrpc.Client, followFarmerListUri string) *AllFollowing {
 	allFollowing := &AllFollowing{
 		database:            database,
-		client:              client,
 		publicClient:        publicClient,
 		followFarmerListUri: followFarmerListUri,
 	}
@@ -123,11 +125,15 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		return err
 	}
 
+	client, err := getClientForDid(ctx, user.UserDid)
+	if err != nil {
+		return err
+	}
 	syncStart := time.Now().UTC().Format(time.RFC3339)
 	follows := make([]schema.Following, 0, 100)
 	for cursor := ""; ; {
 		lastRecorded := time.Now().UTC().Format(time.RFC3339)
-		followResult, err := atproto.RepoListRecords(ctx, allFollowing.client, "app.bsky.graph.follow", cursor, 100, user.UserDid, false, "", "")
+		followResult, err := atproto.RepoListRecords(ctx, client, "app.bsky.graph.follow", cursor, 100, user.UserDid, false, "", "")
 		if err != nil {
 			return err
 		}
@@ -152,7 +158,7 @@ func (allFollowing *AllFollowing) SyncFollowing(ctx context.Context, userDid str
 		}
 		cursor = *followResult.Cursor
 	}
-	err := allFollowing.removeFollowingNotRecordedAfter(ctx, user.UserDid, syncStart)
+	err = allFollowing.removeFollowingNotRecordedAfter(ctx, user.UserDid, syncStart)
 	if err != nil {
 		return err
 	}
@@ -213,10 +219,14 @@ func (allFollowing *AllFollowing) SyncList(ctx context.Context, listUri string) 
 		return fmt.Errorf("cannot parse list uri %s", listUri)
 	}
 
+	client, err := getClientForDid(ctx, listRepo)
+	if err != nil {
+		return err
+	}
 	memberships := make([]schema.ListMembership, 0, 100)
 	for cursor := ""; ; {
 		lastRecorded := time.Now().UTC().Format(time.RFC3339)
-		itemsResult, err := atproto.RepoListRecords(ctx, allFollowing.client, "app.bsky.graph.listitem", cursor, 100, listRepo, false, "", "")
+		itemsResult, err := atproto.RepoListRecords(ctx, client, "app.bsky.graph.listitem", cursor, 100, listRepo, false, "", "")
 		if err != nil {
 			return err
 		}
@@ -244,7 +254,7 @@ func (allFollowing *AllFollowing) SyncList(ctx context.Context, listUri string) 
 		}
 		cursor = *itemsResult.Cursor
 	}
-	err := allFollowing.database.Updates.DeleteListMembershipNotRecordedBefore(ctx, writeSchema.DeleteListMembershipNotRecordedBeforeParams{
+	err = allFollowing.database.Updates.DeleteListMembershipNotRecordedBefore(ctx, writeSchema.DeleteListMembershipNotRecordedBeforeParams{
 		ListUri:      listUri,
 		LastRecorded: syncStart,
 	})
@@ -514,4 +524,20 @@ func (allFollowing *AllFollowing) Purge(ctx context.Context) error {
 
 	fmt.Println("Purge complete")
 	return nil
+}
+
+func getClientForDid(ctx context.Context, didString string) (*xrpc.Client, error) {
+	did := syntax.DID(didString)
+
+	identity, err := DidDirectory.LookupDID(ctx, did)
+	if err != nil {
+		return nil, err
+	}
+
+	pdsUrl := identity.PDSEndpoint()
+
+	client := xrpc.Client{
+		Host: pdsUrl,
+	}
+	return &client, nil
 }
