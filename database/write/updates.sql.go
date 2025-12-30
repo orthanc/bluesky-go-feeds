@@ -885,6 +885,24 @@ func (q *Queries) UpdateSessionLastSeen(ctx context.Context, arg UpdateSessionLa
 	return err
 }
 
+const updateSessionPostsSince = `-- name: UpdateSessionPostsSince :exec
+update session
+set
+  "postsSince" = ?
+where
+  "sessionId" = ?
+`
+
+type UpdateSessionPostsSinceParams struct {
+	PostsSince string
+	SessionId  int64
+}
+
+func (q *Queries) UpdateSessionPostsSince(ctx context.Context, arg UpdateSessionPostsSinceParams) error {
+	_, err := q.db.ExecContext(ctx, updateSessionPostsSince, arg.PostsSince, arg.SessionId)
+	return err
+}
+
 const updateUserLastSeen = `-- name: UpdateUserLastSeen :many
 update user
 set

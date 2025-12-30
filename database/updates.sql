@@ -188,6 +188,13 @@ set
 where
   "sessionId" = ?;
 
+-- name: UpdateSessionPostsSince :exec
+update session
+set
+  "postsSince" = ?
+where
+  "sessionId" = ?;
+
 -- name: DeleteSessionsBefore :execrows
 delete from session
 where

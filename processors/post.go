@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/bluesky-social/indigo/api/bsky"
@@ -36,6 +38,8 @@ type PostProcessor struct {
 	PublicClient *xrpc.Client
 	PostUrisChan chan ReferencedPost
 }
+
+var commandRegexp = regexp.MustCompile(`!(catchup)\s+(rewind|forward)`)
 
 func NewPostProcessor(Database *database.Database,
 	PublicClient *xrpc.Client) *PostProcessor {
@@ -232,6 +236,83 @@ func (processor *PostProcessor) batchEnsurePostsSaved(ctx context.Context) {
 	}
 }
 
+func (processor *PostProcessor) processCommandPosts(ctx context.Context, event *models.Event, post bsky.FeedPost) {
+	commandMatches := commandRegexp.FindStringSubmatch(strings.ToLower(post.Text))
+	if commandMatches != nil {
+		if commandMatches[1] == "catchup" && commandMatches[2] == "rewind" {
+			lastSessions, err := processor.Database.Queries.GetLastSession(ctx, read.GetLastSessionParams{
+				UserDid: event.Did,
+				Algo:    database.ToNullString("catchup"),
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP REWIND ERROR: unable to load last session %e\n", err)
+				return
+			}
+			if len(lastSessions) == 0 {
+				return
+			}
+			lastSession := lastSessions[0]
+			currentPostsSince, err := time.Parse(time.RFC3339, lastSession.PostsSince)
+			if err != nil {
+				fmt.Printf("CATCHUP REWIND ERROR: unable to parse current posts since %e\n", err)
+				return
+			}
+
+			rewindToSessions, err := processor.Database.Queries.GetRewindToSession(ctx, read.GetRewindToSessionParams{
+				UserDid:       event.Did,
+				Algo:          database.ToNullString("catchup"),
+				StartedBefore: lastSession.PostsSince,
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP REWIND ERROR: unable to load rewind session %e\n", err)
+				return
+			}
+			newPostsSince := currentPostsSince.Add(time.Duration(-24) * time.Hour).Format(time.RFC3339)
+			if len(rewindToSessions) > 0 {
+				newPostsSince = rewindToSessions[0].StartedAt
+			}
+
+			processor.Database.Updates.UpdateSessionPostsSince(ctx, writeSchema.UpdateSessionPostsSinceParams{
+				SessionId:  lastSession.SessionId,
+				PostsSince: newPostsSince,
+			})
+		}
+		if commandMatches[1] == "catchup" && commandMatches[2] == "forward" {
+			lastSessions, err := processor.Database.Queries.GetLastSession(ctx, read.GetLastSessionParams{
+				UserDid: event.Did,
+				Algo:    database.ToNullString("catchup"),
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP REWIND ERROR: unable to load last session %e\n", err)
+				return
+			}
+			if len(lastSessions) == 0 {
+				return
+			}
+			lastSession := lastSessions[0]
+
+			forwardToSessions, err := processor.Database.Queries.GetForwardSession(ctx, read.GetForwardSessionParams{
+				UserDid:      event.Did,
+				Algo:         database.ToNullString("catchup"),
+				StartedAfter: lastSession.PostsSince,
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP REWIND ERROR: unable to load rewind session %e\n", err)
+				return
+			}
+			if len(forwardToSessions) == 0 {
+				return
+			}
+			forwardToSession := forwardToSessions[0]
+
+			processor.Database.Updates.UpdateSessionPostsSince(ctx, writeSchema.UpdateSessionPostsSinceParams{
+				SessionId:  lastSession.SessionId,
+				PostsSince: forwardToSession.StartedAt,
+			})
+		}
+	}
+}
+
 func (processor *PostProcessor) Process(ctx context.Context, event *models.Event, postUri string) error {
 	switch event.Commit.Operation {
 	case models.CommitOperationCreate:
@@ -240,6 +321,8 @@ func (processor *PostProcessor) Process(ctx context.Context, event *models.Event
 			fmt.Printf("failed to unmarshal post: %s : at://%s/%s/%s\n", err, event.Did, event.Commit.Collection, event.Commit.RKey)
 			return nil
 		}
+
+		processor.processCommandPosts(ctx, event, post)
 
 		var replyParent, replyParentAuthor, replyRoot, replyRootAuthor, externalUri, quotedPostUri string
 		if post.Reply != nil {

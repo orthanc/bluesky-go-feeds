@@ -82,6 +82,58 @@ func (q *Queries) GetFollowingFollowData(ctx context.Context, arg GetFollowingFo
 	return i, err
 }
 
+const getForwardSession = `-- name: GetForwardSession :many
+select
+  sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
+from
+  session
+where
+  session."userDid" = ?
+  AND session."algo" = ?
+  AND session."startedAt" > ?3
+order by
+  session."startedAt" asc
+limit
+  1
+`
+
+type GetForwardSessionParams struct {
+	UserDid      string
+	Algo         sql.NullString
+	StartedAfter string
+}
+
+func (q *Queries) GetForwardSession(ctx context.Context, arg GetForwardSessionParams) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, getForwardSession, arg.UserDid, arg.Algo, arg.StartedAfter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.SessionId,
+			&i.UserDid,
+			&i.StartedAt,
+			&i.PostsSince,
+			&i.LastSeen,
+			&i.AccessCount,
+			&i.Algo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLastSession = `-- name: GetLastSession :many
 select
   sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
@@ -398,6 +450,58 @@ func (q *Queries) GetRepostFollowData(ctx context.Context, arg GetRepostFollowDa
 	var i GetRepostFollowDataRow
 	err := row.Scan(&i.PostByAuthor, &i.RepostByAuthor)
 	return i, err
+}
+
+const getRewindToSession = `-- name: GetRewindToSession :many
+select
+  sessionId, userDid, startedAt, postsSince, lastSeen, accessCount, algo
+from
+  session
+where
+  session."userDid" = ?
+  AND session."algo" = ?
+  AND session."startedAt" < ?3
+order by
+  session."lastSeen" desc
+limit
+  1
+`
+
+type GetRewindToSessionParams struct {
+	UserDid       string
+	Algo          sql.NullString
+	StartedBefore string
+}
+
+func (q *Queries) GetRewindToSession(ctx context.Context, arg GetRewindToSessionParams) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, getRewindToSession, arg.UserDid, arg.Algo, arg.StartedBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.SessionId,
+			&i.UserDid,
+			&i.StartedAt,
+			&i.PostsSince,
+			&i.LastSeen,
+			&i.AccessCount,
+			&i.Algo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const isOnList = `-- name: IsOnList :one

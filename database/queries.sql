@@ -89,6 +89,34 @@ order by
 limit
   1;
 
+-- name: GetRewindToSession :many
+select
+  *
+from
+  session
+where
+  session."userDid" = ?
+  AND session."algo" = ?
+  AND session."startedAt" < sqlc.arg ('startedBefore')
+order by
+  session."lastSeen" desc
+limit
+  1;
+
+-- name: GetForwardSession :many
+select
+  *
+from
+  session
+where
+  session."userDid" = ?
+  AND session."algo" = ?
+  AND session."startedAt" > sqlc.arg ('startedAfter')
+order by
+  session."startedAt" asc
+limit
+  1;
+
 -- name: ListFollowerLastRecordedBefore :many
 select
   following,
