@@ -16,7 +16,8 @@ Environment=FEEDGEN_SQLITE_LOCATION="/home/feedgenerator/feed-data.db"
 Environment=FEEDGEN_PUBLISHER_DID={{ feed_publisher_did }}
 Environment=FEEDGEN_HOSTNAME={{ feed_hostname }}
 Environment=PROFILES_DIR=/home/feedgenerator/profiles
-Environment=FOLLOW_FARMERS_LIST=at://did:plc:ocsbmyulc2grbq3esflddyj6/app.bsky.graph.list/3lasodgegrc2a
+Environment=FOLLOW_FARMERS_LIST=at://did:plc:e4elbtctnfqocyfcml6h2lf7/app.bsky.graph.list/3ljj5caa56l2k
+#Environment=FOLLOW_FARMERS_LIST=at://did:plc:ocsbmyulc2grbq3esflddyj6/app.bsky.graph.list/3lasodgegrc2a
 #Environment=GOMEMLIMIT=100MiB
 
 [Install]
