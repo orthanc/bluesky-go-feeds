@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -39,7 +40,7 @@ type PostProcessor struct {
 	PostUrisChan chan ReferencedPost
 }
 
-var commandRegexp = regexp.MustCompile(`!(catchup)\s+(rewind|forward)`)
+var commandRegexp = regexp.MustCompile(`!(catchup)\s+(rewind|forward|new)`)
 
 func NewPostProcessor(Database *database.Database,
 	PublicClient *xrpc.Client) *PostProcessor {
@@ -283,7 +284,7 @@ func (processor *PostProcessor) processCommandPosts(ctx context.Context, event *
 				Algo:    database.ToNullString("catchup"),
 			})
 			if err != nil {
-				fmt.Printf("CATCHUP REWIND ERROR: unable to load last session %e\n", err)
+				fmt.Printf("CATCHUP FORWARD ERROR: unable to load last session %e\n", err)
 				return
 			}
 			if len(lastSessions) == 0 {
@@ -297,7 +298,7 @@ func (processor *PostProcessor) processCommandPosts(ctx context.Context, event *
 				StartedAfter: lastSession.PostsSince,
 			})
 			if err != nil {
-				fmt.Printf("CATCHUP REWIND ERROR: unable to load rewind session %e\n", err)
+				fmt.Printf("CATCHUP FORWARD ERROR: unable to load forward session %e\n", err)
 				return
 			}
 			if len(forwardToSessions) == 0 {
@@ -309,6 +310,34 @@ func (processor *PostProcessor) processCommandPosts(ctx context.Context, event *
 				SessionId:  lastSession.SessionId,
 				PostsSince: forwardToSession.StartedAt,
 			})
+		}
+		if commandMatches[1] == "catchup" && commandMatches[2] == "new" {
+			lastSessions, err := processor.Database.Queries.GetLastSession(ctx, read.GetLastSessionParams{
+				UserDid: event.Did,
+				Algo:    database.ToNullString("catchup"),
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP NEW ERROR: unable to load last session %e\n", err)
+				return
+			}
+			if len(lastSessions) == 0 {
+				return
+			}
+			lastSession := lastSessions[0]
+
+			lastSeen := time.Now().UTC().Format(time.RFC3339)
+			err = processor.Database.Updates.SaveSession(ctx, writeSchema.SaveSessionParams{
+				UserDid:     lastSession.UserDid,
+				StartedAt:   lastSeen,
+				LastSeen:    lastSeen,
+				PostsSince:  lastSession.StartedAt,
+				AccessCount: sql.NullFloat64{Float64: 0, Valid: true},
+				Algo:        lastSession.Algo,
+			})
+			if err != nil {
+				fmt.Printf("CATCHUP NEW ERROR: unable to save new session %e\n", err)
+				return
+			}
 		}
 	}
 }
